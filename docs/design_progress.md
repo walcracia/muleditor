@@ -266,7 +266,9 @@ Known implementation boundary:
 - 新增 README、根 AGENTS、`docs/HANDOFF.md`、`docs/RELEASING.md`；把 AI 可迭代、跨电脑可接班、生成物可下载三条原则写成每次更新的完成条件。
 - 增加 Windows CI、标签发布与共用打包脚本，版本与源提交校验、便携包 README 来源、SHA-256、30 天 Actions 产物、长期 Release 下载均进入持续流程。
 - 本次 `npm ci`、TypeScript 检查、生产构建通过（保留既有 chunk 大小警告）；Rust 4 个测试通过；重新构建 x64 EXE/NSIS，通过版本/PE/启动进程检查。没有重新执行完整 UI 回归，历史截图仅保留作历史证据。
-- 首次推送、云端工作流与下载校验结果在完成后写入 `docs/HANDOFF.md`，发布源码和确认文档提交分开记录。
+- 首次推送已完成，发布源提交 `6e663c9456ed22a986e2e824ce6db2b0fcb5acff`，标签 `v0.1.0`；[基础 CI](https://github.com/walcracia/muleditor/actions/runs/42384077811) 与 [Windows Release](https://github.com/walcracia/muleditor/actions/runs/42384087359) 在全新 Windows 环境全部通过。
+- [v0.1.0 正式下载](https://github.com/walcracia/muleditor/releases/tag/v0.1.0) 的安装包、便携 ZIP、SHA-256 清单已实际下载核对；ZIP 内双文件与源提交通过校验，下载版应用以正确窗口标题、版本和正常响应启动。源码、文档和下载链路均已落实。
+- 精确下载链接/哈希、CI 产物到期时间和下一步记录在 `docs/HANDOFF.md`。发布源提交与确认文档提交分开记录；本次纯文档确认复用已验证源码产物，不重新构建或移动既有标签。
 
 ### 2026-06-10 Repackage Windows EXE
 

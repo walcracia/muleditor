@@ -16,12 +16,12 @@
 
 - 仓库：<https://github.com/walcracia/muleditor>。
 - 当前项目版本：`0.1.0`。
-- 当前目标：将现有完整源码和必要文档纳入 Git；建立跨电脑交接约定、CI 和可下载发布产物。
+- 当前目标：首次 GitHub 迁移、云端验证和可下载发布已完成。后续先同步本仓库，再按用户的新需求发起迭代。
 - 代码基准：包含本交接文件的提交。使用 `git log -1 --format=fuller` 和 `git rev-parse HEAD` 获取实际提交；不要把旧电脑的本地目录当基准。
 - 本次改动范围：仓库初始化/同步、README、AGENTS、交接协议、设计记录、构建产物排除规则、CI 与 Windows 发布脚本；未计划更改编辑器产品行为。
-- 本次本地验证已完成：锁定依赖安装、前端检查/构建、Rust 4 个测试、Windows EXE/NSIS 构建与进程启动检查通过。远端 CI 与 v0.1.0 发布尚待首次推送后确认，具体结果见文末。
+- 本次验证与发布状态：本地检查、云端 CI、Windows Release 全部通过；三个 Release 附件已实际下载，哈希匹配，便携程序启动通过。详细证据见文末。
 
-接班时先核对最新提交、[Actions](https://github.com/walcracia/muleditor/actions) 与 [Releases](https://github.com/walcracia/muleditor/releases)。若迁移仍未完成，先完成推送、CI 和产物链接记录；不要直接开始下一个功能。
+接班时先核对最新提交、[Actions](https://github.com/walcracia/muleditor/actions) 与 [v0.1.0 Release](https://github.com/walcracia/muleditor/releases/tag/v0.1.0)。第一步执行 `git status --short --branch`，确认工作区干净后 `git fetch origin --prune`、`git pull --ff-only`；新电脑 `git clone` 后按下述命令恢复依赖。当前没有未完成的迁移工作；候选功能需遵循用户的下一项优先级。
 
 ## 源码当前状态
 
@@ -93,6 +93,7 @@ pwsh -NoProfile -File ./scripts/package-release.ps1 -SourceCommit $sourceCommit
 - 当前包未签名；发布时须如实说明签名状态。
 - 历史构建有 Monaco/Mermaid 相关的 chunk 大小警告。优化包体时避免破坏 worker、预览和模型释放。
 - 尚无完整、可持续运行的自动 UI 回归集；历史 Playwright 截图是历史证据，不证明本次行为。
+- 原生目录导入当前最多 1000 个文件、每个文件最多 5 MiB；工作区会话尚未持久化，目前只持久化界面语言。
 
 迁移完成后，下个 agent 先复现基线、核对当前 UI 和下载包，再根据用户下一项需求选择任务；上述候选任务没有自动替代用户优先级。
 
@@ -125,4 +126,18 @@ Git 状态：已推送分支；未提交内容及归属（如有）
 - `npm run tauri:build -- --no-sign`：通过，重新生成 Windows x64 EXE 与 NSIS；本次构建临时指定本机 `CARGO_TARGET_DIR`，不依赖历史 EXE。
 - 新 EXE 启动检查：进程运行、有原生窗口句柄、`Responding = True`，产品版本 `0.1.0`，`NotSigned`。只关闭了本次启动的测试进程，没有操作用户已运行的应用。本次没有重做完整界面回归。
 - 工作流 YAML 解析、版本校验、打包脚本和 ZIP 双文件内容/EXE 一致性：通过；上传候选文件未检出常见 token/私钥模式，依赖和缓存目录已排除。
-- 首次推送后的远端 CI、Release、下载校验与最终源码 SHA：发布完成后由确认提交补充。此处仍待补充时，不能声称远端验证和发布已经成功。
+- 已推送源码：`6e663c9456ed22a986e2e824ce6db2b0fcb5acff`（标签 `v0.1.0`）。后续发布确认只修改文档，源码和发布标签不变。
+- 云端 [CI #42384077811](https://github.com/walcracia/muleditor/actions/runs/42384077811)：已成功，包含全新依赖安装、版本检查、前端检查/构建与 Rust 测试。
+- 前端产物：`muleditor-web-6e663c9456ed22a986e2e824ce6db2b0fcb5acff`，下载入口为上述 CI 的 Artifacts（需登录）；保留 30 天，当前到期时间 2026-12-07 23:01 Asia/Shanghai。前端产物需 HTTP 服务器运行。
+- [Windows Release #42384087359](https://github.com/walcracia/muleditor/actions/runs/42384087359)：已成功，在全新 Windows 环境从 `v0.1.0` 构建并公开发布。Windows Actions 备份产物保留 30 天；长期入口为下表的 Release。
+- 已实际下载 [正式 Release](https://github.com/walcracia/muleditor/releases/tag/v0.1.0) 的全部三个附件，两个程序包与 `SHA256SUMS.txt` 完全匹配。ZIP 仅包含 `README.txt` 和 `哞-编辑器.exe`；README 的源提交与标签一致。
+- 下载版程序启动验证：窗口标题 `哞-编辑器`、窗口句柄非零、进程响应正常、版本 `0.1.0`、签名 `NotSigned`。EXE SHA-256：`690538427136b68311f22e4b789b1b9fe01705f298fd2680812892f998e13055`。未运行安装器安装流程，也未重做完整 UI 回归。
+- CI 前端 artifact 也已实际下载，含 `index.html` 与 65 个 assets 文件。正式包的校验值对应云端构建，不能拿历史或本机另一次构建的二进制哈希替代。
+- 本确认提交仅更新文档，使用 `[skip ci]` 避免重复编译；所关联的源提交、已通过的 CI 与可下载 Release 均为上述版本。源码、配置或依赖改动仍按正常 CI/发布流程验证。
+- Git 交接：`main` 已推送，包含本交接的提交为最新文档确认提交；本地没有未提交的源码工作。获取精确确认提交运行 `git log -1`；正式发布源提交固定为 `6e663c9456ed22a986e2e824ce6db2b0fcb5acff`。
+
+| 可下载附件 | 已下载验证的 SHA-256 |
+| --- | --- |
+| [便携 ZIP](https://github.com/walcracia/muleditor/releases/download/v0.1.0/MulEditor-0.1.0-windows-x64-portable.zip) | `2f50da432bae363c3833eaca2df62caee607bbe336286c3a32dbfff92de501d3` |
+| [Windows 安装包](https://github.com/walcracia/muleditor/releases/download/v0.1.0/MulEditor-0.1.0-windows-x64-setup.exe) | `7b902fdaf3c7f5011d0b736a152a34b2d1fa448b1989a0f1e1ea0b1fd76db0e7` |
+| [SHA256SUMS.txt](https://github.com/walcracia/muleditor/releases/download/v0.1.0/SHA256SUMS.txt) | `ddf1aebf869c74d5ec0e683ab9654a9b0bb50aadd191a85ab52bc0c3d4db0803` |
