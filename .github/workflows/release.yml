@@ -1,0 +1,116 @@
+name: Windows Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing version tag, for example v0.1.0'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+    steps:
+      - name: Validate release tag format
+        run: |
+          if ($env:RELEASE_TAG -notmatch '^v\d+\.\d+\.\d+$') {
+            throw 'A stable version tag vX.Y.Z is required.'
+          }
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: '22'
+          package-manager-cache: false
+      - name: Validate tag and record source commit
+        run: |
+          ./scripts/package-release.ps1 -ValidateOnly -ExpectedVersion $env:RELEASE_TAG.Substring(1)
+          $sourceCommit = git rev-parse HEAD
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot read source commit.' }
+          $tagCommit = git rev-parse "refs/tags/$($env:RELEASE_TAG)^{}"
+          if ($LASTEXITCODE -ne 0 -or $tagCommit -ne $sourceCommit) { throw 'Tag does not identify this source commit.' }
+          "SOURCE_COMMIT=$sourceCommit" >> $env:GITHUB_ENV
+      - name: Install locked frontend dependencies
+        run: npm ci
+      - name: Type check and build frontend
+        run: |
+          npm run check
+          if ($LASTEXITCODE -ne 0) { throw 'Type check failed.' }
+          npm run build
+          if ($LASTEXITCODE -ne 0) { throw 'Frontend build failed.' }
+      - name: Install stable Rust
+        run: |
+          rustup toolchain install stable --profile minimal
+          if ($LASTEXITCODE -ne 0) { throw 'Rust installation failed.' }
+          rustup default stable
+          if ($LASTEXITCODE -ne 0) { throw 'Rust setup failed.' }
+      - name: Test Rust backend
+        run: cargo test --locked --manifest-path src-tauri/Cargo.toml
+      - name: Build Windows executable and NSIS installer
+        run: npm run tauri:build -- --no-sign
+      - name: Package downloads and checksums
+        run: ./scripts/package-release.ps1 -ExpectedVersion $env:RELEASE_TAG.Substring(1) -SourceCommit $env:SOURCE_COMMIT
+      - name: Keep downloadable workflow artifacts
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: muleditor-windows-${{ env.RELEASE_TAG }}-${{ env.SOURCE_COMMIT }}
+          path: release/github/*
+          if-no-files-found: error
+          retention-days: 30
+      - name: Publish GitHub Release downloads
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          $version = $env:RELEASE_TAG.Substring(1)
+          $assets = @(
+            "release/github/MulEditor-$version-windows-x64-portable.zip",
+            "release/github/MulEditor-$version-windows-x64-setup.exe",
+            'release/github/SHA256SUMS.txt'
+          )
+          $existingRelease = gh release view $env:RELEASE_TAG --json isDraft 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            if (-not ($existingRelease | ConvertFrom-Json).isDraft) {
+              throw 'This release is already published. Create a new version instead of replacing published downloads.'
+            }
+          } else {
+            gh release create $env:RELEASE_TAG --verify-tag --draft --title "MulEditor $version"
+            if ($LASTEXITCODE -ne 0) { throw 'Cannot create draft release.' }
+          }
+          $notes = @"
+          Windows x64 release, built from source commit $env:SOURCE_COMMIT.
+
+          Downloads:
+          - portable.zip: extract and run 哞-编辑器.exe (requires WebView2 Runtime).
+          - setup.exe: Windows NSIS installer.
+          - SHA256SUMS.txt: SHA-256 checksums for both downloads.
+
+          This build is unsigned. The Monaco editor currently loads from cdn.jsdelivr.net and requires network access.
+          "@
+          $notesPath = Join-Path $env:RUNNER_TEMP 'muleditor-release-notes.md'
+          [IO.File]::WriteAllText($notesPath, $notes, [Text.UTF8Encoding]::new($false))
+          gh release upload $env:RELEASE_TAG @assets --clobber
+          if ($LASTEXITCODE -ne 0) { throw 'Release asset upload failed; the release remains a draft.' }
+          gh release edit $env:RELEASE_TAG --notes-file $notesPath --draft=false
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot publish release.' }

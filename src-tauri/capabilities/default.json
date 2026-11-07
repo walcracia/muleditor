@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Default 哞-编辑器 desktop permissions",
+  "windows": ["main"],
+  "permissions": ["core:default", "dialog:default"]
+}
