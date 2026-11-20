@@ -159,7 +159,7 @@ function inlineText(tokens: Token[]): string {
 function headingSlug(text: string): string {
   const slug = text.normalize("NFKC").toLowerCase().trim().replace(/\s+/g, "-").replace(/[^\p{L}\p{M}\p{N}_-]/gu, "") || "section";
   // DOMPurify's DOM-clobbering guard intentionally rejects these as element IDs.
-  return /^(?:location|name|id|attributes|children|constructor|__proto__|prototype|forms|images|links|scripts|body|head|cookie|write|open|close)$/i.test(slug)
+  return /^(?:on[a-z]+|__proto__|action|after|all|anchors|append|applets|attributes|before|blur|body|charset|children|clear|click|close|closest|constructor|contains|cookie|dataset|dir|doctype|domain|draggable|elements|embeds|encoding|enctype|evaluate|focus|forms|head|hidden|id|images|implementation|lang|length|links|location|matches|method|name|nonce|normalize|open|plugins|prefix|prepend|prototype|referrer|remove|reset|role|scripts|slot|style|submit|target|title|translate|write|writeln)$/i.test(slug)
     ? `md-${slug}` : slug;
 }
 

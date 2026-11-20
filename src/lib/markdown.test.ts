@@ -48,6 +48,13 @@ describe("one Markdown token model", () => {
     expect(stripFrontMatter("# title\n\n---\n")).toBe("# title\n\n---\n");
   });
 
+  it("keeps anchors stable when headings collide with browser DOM property names", async () => {
+    const source = ["Title", "Submit", "Elements", "onload", "中文"].map((text) => `# ${text}`).join("\n\n");
+    const result = await renderMarkdownDocument(source);
+    expect(Array.from(htmlRoot(result.html).querySelectorAll("h1"), (heading) => heading.id)).toEqual(result.headings.map((heading) => heading.id));
+    expect(result.headings.map((heading) => heading.id)).toEqual(["md-title", "md-submit", "md-elements", "md-onload", "中文"]);
+  });
+
   it("keeps task lists, tables, strikethrough, autolinks and footnote IDs/backlinks", async () => {
     const { html } = await renderMarkdownDocument("- [x] done\n- [ ] todo\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n~~gone~~ https://example.com\n\nA note[^one].\n\n[^one]: footnote content\n");
     const root = htmlRoot(html);
@@ -138,6 +145,13 @@ describe("untrusted Markdown and image resources", () => {
     await expect(renderMarkdownDocument("![local](image.png)", { resolveImage: async () => "javascript:alert(1)", strictImages: true })).rejects.toThrow("unsafe URL");
   });
 
+  it("does not leave an unprocessed srcset that bypasses the image resolver", async () => {
+    const { html } = await renderMarkdownDocument('<img src="small.png" srcset="https://example.com/large.png 2x">', { resolveImage: async () => "data:image/png;base64,AA==" });
+    const image = htmlRoot(html).querySelector("img");
+    expect(image?.hasAttribute("srcset")).toBe(false);
+    expect(image?.getAttribute("src")).toBe("data:image/png;base64,AA==");
+  });
+
   it("rejects cancellation while image resolution is pending", async () => {
     const controller = new AbortController();
     let finish: ((value: string) => void) | undefined;
@@ -184,6 +198,20 @@ describe("Mermaid inside the shared pipeline", () => {
     await rendering;
     expect(root.querySelector("svg")).toBeNull();
     expect(root.querySelector("code")).not.toBeNull();
+  });
+
+  it("does not insert a superseded render into the same root", async () => {
+    let finishOld: ((value: { svg: string }) => void) | undefined;
+    mermaid.render.mockImplementationOnce(() => new Promise((resolve) => { finishOld = resolve; }));
+    const root = htmlRoot('<pre><code class="language-mermaid">old graph</code></pre>');
+    const old = renderMermaidBlocks(root, { errorLabel: "error" });
+    await vi.waitFor(() => expect(mermaid.render).toHaveBeenCalledOnce());
+    root.innerHTML = '<pre><code class="language-mermaid">new graph</code></pre>';
+    await renderMermaidBlocks(root, { errorLabel: "error" });
+    finishOld?.({ svg: '<svg id="old-diagram"></svg>' });
+    await old;
+    expect(root.querySelector("#old-diagram")).toBeNull();
+    expect(root.querySelector("foreignObject div")?.textContent).toBe("中文 label");
   });
 
   it("rejects already aborted shared render calls", async () => {
