@@ -54,11 +54,20 @@ describe("browser Markdown images", () => {
     await expect(resolveMarkdownImage("old.png", { relativePath: "beta/a.md", workspaceRoot: "beta" })).resolves.toMatch(/^data:image\/png;base64,/);
   });
 
-  it("supports same-directory multi-file selections and replaces that selection group", async () => {
-    registerBrowserMarkdownFiles([imageFile("a.png")]);
-    await expect(resolveMarkdownImage("./a.png", { relativePath: "readme.md" })).resolves.toMatch(/^data:image\/png;base64,/);
-    registerBrowserMarkdownFiles([imageFile("b.png")]);
-    await expect(resolveMarkdownImage("a.png", { relativePath: "readme.md" })).resolves.toBeUndefined();
+  it("retains loose images when another Markdown document is selected later", async () => {
+    registerBrowserMarkdownFiles([new File(["![image](img.png)"], "a.md"), imageFile("img.png")]);
+    const original = await resolveMarkdownImage("./img.png", { relativePath: "a.md" });
+    expect(original).toMatch(/^data:image\/png;base64,/);
+    registerBrowserMarkdownFiles([new File(["# Another document"], "b.md")]);
+    await expect(resolveMarkdownImage("img.png", { relativePath: "a.md" })).resolves.toBe(original);
+  });
+
+  it("overwrites a loose image only when a newer selection has the same filename", async () => {
+    registerBrowserMarkdownFiles([imageFile("img.png", 1), imageFile("other.png")]);
+    const original = await resolveMarkdownImage("img.png", { relativePath: "a.md" });
+    registerBrowserMarkdownFiles([imageFile("img.png", 2)]);
+    expect(await resolveMarkdownImage("img.png", { relativePath: "a.md" })).not.toBe(original);
+    await expect(resolveMarkdownImage("other.png", { relativePath: "a.md" })).resolves.toMatch(/^data:image\/png;base64,/);
   });
 
   it("requires a source and refuses to escape an imported folder", async () => {

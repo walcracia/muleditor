@@ -22,7 +22,8 @@ const imageTypes: Record<string, string> = {
 /**
  * Keep the File objects selected by the user, including images which are not editor tabs.
  * Folder imports are keyed by their webkitRelativePath root; reimporting a root replaces
- * that root only. Files selected without a folder share a separate, replaceable group.
+ * that root only. Files selected without a folder share a separate, cumulative group;
+ * a newly selected loose file replaces only the previously selected file of the same name.
  * An empty registration clears all groups. No object URLs or filesystem permissions persist.
  */
 export function registerBrowserMarkdownFiles(files: Iterable<File>): void {
@@ -31,7 +32,7 @@ export function registerBrowserMarkdownFiles(files: Iterable<File>): void {
     const path = normalizeRelativePath(file.webkitRelativePath || file.name);
     if (!path) continue;
     const root = file.webkitRelativePath && path.includes("/") ? path.split("/")[0] : "";
-    const group = replacements.get(root) ?? new Map<string, File>();
+    const group = replacements.get(root) ?? (root ? new Map<string, File>() : new Map(browserFiles.get("")));
     group.set(path, file);
     replacements.set(root, group);
   }
