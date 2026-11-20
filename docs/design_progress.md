@@ -272,6 +272,7 @@ Known implementation boundary:
 - 渲染/净化/资源/导出/导航共 65 个前端测试通过，Rust 9 个测试通过；3 组真实 Edge 浏览器回归通过，覆盖下载 HTML 离线显示、快速切换、最小窗口、预览链接和 JSON 导出。`npm ci`、类型检查和生产构建通过。
 - 导出图片通过签名与实际解码检查，读取/解码有超时，阻止伪图片和截断图片悄悄进入交付物；原生保存取消恢复状态。
 - 截图：`docs/assets/markdown-rendering-0.2.0.png`、`docs/assets/markdown-minimum-window-0.2.0.png`。版本为 `0.2.0`；云端检查和发布结果在完成后写入 HANDOFF。
+- 发布已确认：[CI](https://github.com/walcracia/muleditor/actions/runs/44686314724) 与 [Windows Release](https://github.com/walcracia/muleditor/actions/runs/44686352750) 均成功；[v0.2.0](https://github.com/walcracia/muleditor/releases/tag/v0.2.0) 三个附件实际下载校验通过。发布源提交 `86ee229e150fbb65034b1297087acebd083a1a1d`；源码与后续确认文档提交分开记录，精确下载哈希及接班第一步见 HANDOFF。
 
 ### 2026-11-07 GitHub 与多电脑 AI 交接基础设施
 

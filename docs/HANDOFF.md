@@ -15,10 +15,10 @@
 ## 当前交接：Markdown 统一渲染与导出
 
 - 用户范围：保留 React、Monaco、多格式架构，补公式、预览代码高亮、脚注、标题锚点、本地图片、HTML 净化，并统一预览和导出以保留图表/样式。
-- 工作分支：`agent/markdown-rendering`；基线 `e31d737b33d230c4a0991527aa05c9689e175372`。三个子任务在独立 worktree/分支实施，合并前不共享未提交源码。
-- 本次版本 `0.2.0`，尚待发布；稳定下载仍为下述 `v0.1.0`。
-- 当前状态：实现已整合；`npm ci`、类型检查、生产构建、65 个前端测试、9 个 Rust 测试和 3 组真实 Edge 浏览器回归通过。Windows EXE/NSIS 构建通过，云端 CI/发布仍待确认。
-- 下一步：完成 Windows 包核验，提交并推送源码/文档，再发布 `v0.2.0`；等待 CI 与 Release 成功后实际下载核验并回填。历史记录不能代替本次证据。
+- 当前分支 `main`；功能分支已整合并推送。三个子任务在独立 worktree/分支实施，合并前不共享未提交源码。
+- 当前发布 `v0.2.0`，源码固定为 `86ee229e150fbb65034b1297087acebd083a1a1d`；随后包含本交接的提交仅确认文档，不移动标签或替换已发布资产。
+- 当前状态：本地与云端检查全部通过；65 个前端测试、9 个 Rust 测试、3 组浏览器回归和 Windows EXE/NSIS 构建通过。三个 Release 附件已实际下载，两个包的哈希与清单匹配，ZIP 来源提交和 EXE 版本/签名已核验。
+- 下一步：迁移/本轮功能均已完成。接班先 `git status --short --branch`，工作区干净后 `git fetch origin --prune`、`git pull --ff-only`；新环境 `npm ci`，按用户下一项需求创建独立分支。此处候选事项不自动替代用户优先级。
 - 模块：`markdown.ts` 统一渲染和同步标题/脚注锚点解析；`markdownSanitize.ts` 净化用户 HTML 与生成的公式/SVG；`markdownResources.ts` 对接 Rust/浏览器 File；`exporters.ts`、`markdownExportStyles.ts` 生成自包含 HTML，`src/markdown.css` 同时用于预览/导出。
 - 本次覆盖：KaTeX 四种分隔符和 math fence、代码高亮/未知语言回退、脚注/返回链接、中文/重复/Setext 标题、Front Matter 行号、Mermaid/HTML 净化、本地图片/字体离线内联、预览隐藏导出、快速切换、链接不离开工作台及 JSON 导出。
 - 本次边界：完整安装器安装过程和全格式桌面 UI 尚未逐项回归。Monaco 保留原 CDN 加载方式，应用编辑区仍需访问 jsDelivr；导出 HTML 可离线查看。
@@ -26,6 +26,23 @@
 - 资源限制：本地图片只接受相对路径，支持 `../` 和中文/空格/编码文件名，每图 10 MiB；导出图片合计 50 MiB，远程图片需允许浏览器跨源读取，读取/解码 10 秒超时；SVG 外部依赖、未支持的媒体和缺图会明确阻止导出。
 - 浏览器不同导入根互相隔离，同名根重新导入替换映射；普通多选保留图片，同名图片以最后选择为准。图片由预览检查，不匹配文本标签误报。
 - 安全依赖：直接渲染使用锁定 DOMPurify；非破坏性修复已消除高危告警，现有 Monaco/Mermaid 嵌套依赖仍有 1 中危/3 低危告警，未强制降级 Monaco 或升级 Mermaid 主版本。
+
+### 本次验证与下载证据（2026-11-20）
+
+- 环境：Windows x64，Node `22.14.0`、npm `10.9.2`、Rust `1.99.1`；本地浏览器为 Edge，云端浏览器为 Playwright Chromium。
+- `npm ci`、`npm run check`、`npm test`、`npm run build`、`cargo check --locked`、`cargo test --locked`、`npm run tauri:build -- --no-sign`：均通过（Cargo manifest 为 `src-tauri/Cargo.toml`；本机 target-dir 缓存是可选配置）。保留已有 chunk 大小警告。
+- 浏览器 `npm run test:e2e`：3 组通过；下载 HTML 离线加载公式/字体/图表/本地图片，检查源 HTML 净化、快速切换、预览隐藏导出、链接保留工作台、1040×680 单栏阅读和 JSON 导出。代理机器的本地服务检测由配置中的 NO_PROXY 保证直连。
+- [云端 CI](https://github.com/walcracia/muleditor/actions/runs/44686314724)：成功，覆盖锁定安装、版本/类型检查、65 个前端测试、3 组 Chromium 回归、Rust 测试及前端 artifact。
+- [Windows 发布构建](https://github.com/walcracia/muleditor/actions/runs/44686352750)：成功，从上述标签重新构建并发布 Windows x64 安装包、便携 ZIP 和 SHA-256 清单。
+- 前端 artifact `muleditor-web-86ee229e150fbb65034b1297087acebd083a1a1d` 保留 30 天，当前到期 2026-12-20 14:18 Asia/Shanghai；Windows artifact 同样保留 30 天。长期下载请使用下面的 Release。
+- [v0.2.0 Release](https://github.com/walcracia/muleditor/releases/tag/v0.2.0) 三个附件已实际下载；ZIP 内只有 `README.txt`、`哞-编辑器.exe`，README 中的源提交与标签一致。下载版 EXE 版本 `0.2.0`、`NotSigned`，SHA-256 `54b1f9086b93ee4339b2c0f4f97afd8da07d846aecfc2ceaffe3d501d7d07eec`。
+- 下载版只做哈希、包内容及版本/签名的只读核验；原生启动与渲染验证使用本机同源构建完成，未运行安装器安装。本次确认只更新文档，使用 `[skip ci]` 复用同源成功检查与下载产物。
+
+| 下载 | 已核验 SHA-256 |
+| --- | --- |
+| [便携 ZIP](https://github.com/walcracia/muleditor/releases/download/v0.2.0/MulEditor-0.2.0-windows-x64-portable.zip) | `d4add1bdd74ff9e55fe6704a2ce662afe9adcf6c229afaae8ce1476d56ec7259` |
+| [安装包](https://github.com/walcracia/muleditor/releases/download/v0.2.0/MulEditor-0.2.0-windows-x64-setup.exe) | `36476dbb4cc618a99f3b37dd0ec81c48c5a9f04925670c12dd713569b06d3691` |
+| [校验清单](https://github.com/walcracia/muleditor/releases/download/v0.2.0/SHA256SUMS.txt) | `821c709dbad73043d6acfb8940a3f02e72c376b4a0028e07d994dc5466c92d7f` |
 
 ## 上一次交接：2026-11-07 GitHub 迁移
 

@@ -14,7 +14,7 @@ Markdown 支持 KaTeX 公式（`$...$`、`$$...$$`、`\(...\)`、`\[...\]` 及 `
 
 前往 [GitHub Releases](https://github.com/walcracia/muleditor/releases) 下载已发布版本，在对应版本的 Assets 中选择：
 
-当前已验证版本：[v0.1.0](https://github.com/walcracia/muleditor/releases/tag/v0.1.0)（[便携 ZIP](https://github.com/walcracia/muleditor/releases/download/v0.1.0/MulEditor-0.1.0-windows-x64-portable.zip) · [安装包](https://github.com/walcracia/muleditor/releases/download/v0.1.0/MulEditor-0.1.0-windows-x64-setup.exe) · [校验清单](https://github.com/walcracia/muleditor/releases/download/v0.1.0/SHA256SUMS.txt)）。
+当前已验证版本：[v0.2.0](https://github.com/walcracia/muleditor/releases/tag/v0.2.0)（[便携 ZIP](https://github.com/walcracia/muleditor/releases/download/v0.2.0/MulEditor-0.2.0-windows-x64-portable.zip) · [安装包](https://github.com/walcracia/muleditor/releases/download/v0.2.0/MulEditor-0.2.0-windows-x64-setup.exe) · [校验清单](https://github.com/walcracia/muleditor/releases/download/v0.2.0/SHA256SUMS.txt)）。
 
 - `MulEditor-{version}-windows-x64-setup.exe`：Windows x64 安装包。
 - `MulEditor-{version}-windows-x64-portable.zip`：解压后运行的便携包。
