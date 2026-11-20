@@ -15,6 +15,13 @@ export interface MarkdownHeading {
   line: number;
 }
 
+export interface MarkdownAnchor {
+  id: string;
+  text: string;
+  line: number;
+  kind: "heading" | "footnote" | "footnote-ref";
+}
+
 export interface MarkdownRenderOptions {
   signal?: AbortSignal;
   errorLabel?: string;
@@ -36,6 +43,46 @@ export function extractMarkdownHeadings(source: string): MarkdownHeading[] {
   const prepared = prepareMarkdown(source);
   const parser = createParser();
   return collectHeadings(parser.parse(prepared.content, {}), prepared.lineOffset);
+}
+
+/** All generated document anchors, including headings and footnote/backlink targets. */
+export function extractMarkdownAnchors(source: string): MarkdownAnchor[] {
+  const prepared = prepareMarkdown(source);
+  const parser = createParser();
+  const environment = {};
+  const tokens = parser.parse(prepared.content, environment);
+  const anchors: MarkdownAnchor[] = collectHeadings(tokens, prepared.lineOffset).map(({ id, text, line }) => ({ id, text, line, kind: "heading" }));
+  const firstReferenceLine = new Map<number, number>();
+  const anchorName = (siblings: Token[], index: number) => {
+    // Delegate numbering to the same footnote plugin renderer used by the HTML pipeline.
+    const base = parser.renderer.rules.footnote_anchor_name(siblings, index, parser.options, environment, parser.renderer);
+    const subId = Number(siblings[index].meta?.subId ?? 0);
+    return `${base}${subId > 0 ? `:${subId}` : ""}`;
+  };
+  const referenceAnchors = (siblings: Token[], startLine: number) => {
+    let line = startLine;
+    siblings.forEach((token, index) => {
+      if (token.type === "footnote_ref") {
+        const id = Number(token.meta?.id);
+        firstReferenceLine.set(id, firstReferenceLine.get(id) ?? line);
+        anchors.push({ id: `fnref${anchorName(siblings, index)}`, text: `[^${token.meta?.label ?? id + 1}]`, line, kind: "footnote-ref" });
+      }
+      if (token.children) referenceAnchors(token.children, line);
+      if (token.type === "softbreak" || token.type === "hardbreak") line += 1;
+    });
+  };
+  for (const token of tokens) {
+    if (token.type === "inline") referenceAnchors(token.children ?? [], (token.map?.[0] ?? 0) + prepared.lineOffset + 1);
+  }
+  tokens.forEach((token, index) => {
+    if (token.type !== "footnote_open") return;
+    const nextClose = tokens.findIndex((next, nextIndex) => nextIndex > index && next.type === "footnote_close");
+    const definition = tokens.slice(index + 1, nextClose < 0 ? undefined : nextClose).find((next) => next.map);
+    const id = Number(token.meta?.id);
+    const line = definition?.map ? definition.map[0] + prepared.lineOffset + 1 : firstReferenceLine.get(id) ?? prepared.lineOffset + 1;
+    anchors.push({ id: `fn${anchorName(tokens, index)}`, text: `[^${token.meta?.label ?? id + 1}]`, line, kind: "footnote" });
+  });
+  return anchors;
 }
 
 export function stripFrontMatter(content: string): string {

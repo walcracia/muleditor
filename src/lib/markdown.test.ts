@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { extractMarkdownHeadings, renderMarkdownDocument, stripFrontMatter } from "./markdown";
+import { extractMarkdownAnchors, extractMarkdownHeadings, renderMarkdownDocument, stripFrontMatter } from "./markdown";
 import { renderMermaidBlocks } from "./mermaid";
 
 const mermaid = vi.hoisted(() => ({ initialize: vi.fn(), render: vi.fn() }));
@@ -69,6 +69,31 @@ describe("one Markdown token model", () => {
     expect(root.querySelector("#fn1")?.textContent).toContain("footnote content");
     expect(root.querySelector('a[href="#fnref1"]')).not.toBeNull();
     expect(root.querySelector("#fnref1")).not.toBeNull();
+  });
+
+  it("extracts heading, footnote and repeated reference anchors from the same parser as the DOM", async () => {
+    const source = "---\ntitle: Demo\n---\n# 中文\n\nA note[^one] and repeat[^one].\nSecond note[^two].\n\n[^one]: First footnote.\n\n[^two]: Second footnote.\n";
+    const anchors = extractMarkdownAnchors(source);
+    expect(anchors).toContainEqual({ id: "中文", text: "中文", line: 4, kind: "heading" });
+    expect(anchors).toContainEqual({ id: "fn1", text: "[^one]", line: 9, kind: "footnote" });
+    expect(anchors).toContainEqual({ id: "fnref1", text: "[^one]", line: 6, kind: "footnote-ref" });
+    expect(anchors).toContainEqual({ id: "fnref1:1", text: "[^one]", line: 6, kind: "footnote-ref" });
+    expect(anchors).toContainEqual({ id: "fnref2", text: "[^two]", line: 7, kind: "footnote-ref" });
+    const root = htmlRoot((await renderMarkdownDocument(source)).html);
+    expect(anchors.map((anchor) => anchor.id).sort()).toEqual(Array.from(root.querySelectorAll("[id]"), (element) => element.id).sort());
+  });
+
+  it("does not invent anchors for fenced/inline code footnotes or unused definitions", () => {
+    const source = "```md\n[^fake]: Not a definition.\nFootnote[^fake]\n```\n\n`[^literal]`\n\n[^unused]: Never referenced.\n";
+    expect(extractMarkdownAnchors(source)).toEqual([]);
+  });
+
+  it("extracts plugin inline-footnote anchors without a separate syntax heuristic", async () => {
+    const source = "Text with ^[an inline note].\n";
+    const anchors = extractMarkdownAnchors(source);
+    expect(anchors.map((anchor) => anchor.id).sort()).toEqual(["fn1", "fnref1"]);
+    const root = htmlRoot((await renderMarkdownDocument(source)).html);
+    expect(anchors.every((anchor) => Array.from(root.querySelectorAll("[id]"), (node) => node.id).includes(anchor.id))).toBe(true);
   });
 
   it("highlights common code languages and escapes unknown code fences", async () => {
