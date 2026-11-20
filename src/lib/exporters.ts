@@ -109,7 +109,7 @@ function createExportImageResolver(tab: DocumentTab, signal?: AbortSignal): (src
         }
         throwIfAborted(signal);
         if (!dataUri) throw new Error(`Cannot embed image: ${src}. Open its folder or check the image path, then export again.`);
-        const checked = validateImageDataUri(dataUri);
+        const checked = await validateImageDataUri(dataUri, signal);
         totalBytes += checked.bytes;
         if (totalBytes > maxTotalImageBytes) throw new Error("Export images exceed the 50 MiB total limit.");
         return checked.dataUri;
@@ -183,7 +183,7 @@ async function readImageBytes(response: Response): Promise<Uint8Array> {
   return bytes;
 }
 
-function validateImageDataUri(dataUri: string): { dataUri: string; bytes: number } {
+async function validateImageDataUri(dataUri: string, signal?: AbortSignal): Promise<{ dataUri: string; bytes: number }> {
   const match = dataUri.match(/^data:([^;,]+)(;base64)?,([\s\S]*)$/i);
   const mime = match?.[1].toLowerCase();
   if (!match || !mime || !supportedImageTypes.has(mime)) throw new Error("Image resolver returned an unsupported image type.");
@@ -210,7 +210,66 @@ function validateImageDataUri(dataUri: string): { dataUri: string; bytes: number
     });
     return { dataUri: `data:image/svg+xml;base64,${encodeBase64(new TextEncoder().encode(sanitized))}`, bytes: bytes.length };
   }
-  return { dataUri: `data:${mime};base64,${encodeBase64(bytes)}`, bytes: bytes.length };
+  if (!hasRasterImageSignature(bytes, mime)) throw new Error(`Image content does not match its declared type: ${mime}.`);
+  const normalizedUri = `data:${mime};base64,${encodeBase64(bytes)}`;
+  await assertRasterDecodable(normalizedUri, mime, signal);
+  return { dataUri: normalizedUri, bytes: bytes.length };
+}
+
+function hasRasterImageSignature(bytes: Uint8Array, mime: string): boolean {
+  const starts = (signature: number[]) => signature.every((value, index) => bytes[index] === value);
+  const ascii = (start: number, end: number) => String.fromCharCode(...bytes.subarray(start, end));
+  switch (mime) {
+    case "image/png": return bytes.length >= 24 && starts([137, 80, 78, 71, 13, 10, 26, 10]);
+    case "image/jpeg": return starts([255, 216, 255]);
+    case "image/gif": return bytes.length >= 13 && ["GIF87a", "GIF89a"].includes(ascii(0, 6));
+    case "image/webp": return bytes.length >= 12 && ascii(0, 4) === "RIFF" && ascii(8, 12) === "WEBP";
+    case "image/bmp": return bytes.length >= 26 && ascii(0, 2) === "BM";
+    case "image/x-icon":
+    case "image/vnd.microsoft.icon": return bytes.length >= 22 && starts([0, 0, 1, 0]);
+    case "image/avif": {
+      if (bytes.length < 16 || ascii(4, 8) !== "ftyp") return false;
+      const boxSize = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(0);
+      if (boxSize < 16 || boxSize > bytes.length || boxSize % 4 !== 0) return false;
+      if (["avif", "avis"].includes(ascii(8, 12))) return true;
+      // AVIF may identify itself in compatible_brands rather than major_brand.
+      for (let offset = 16; offset + 4 <= boxSize; offset += 4) {
+        if (["avif", "avis"].includes(ascii(offset, offset + 4))) return true;
+      }
+      return false;
+    }
+    default: return false;
+  }
+}
+
+async function assertRasterDecodable(dataUri: string, mime: string, signal?: AbortSignal): Promise<void> {
+  if (typeof Image === "undefined") return;
+  const image = new Image();
+  // jsdom and older runtimes have no decoder; signatures still get checked.
+  if (typeof image.decode !== "function") return;
+  throwIfAborted(signal);
+  let rejectInterrupted: ((reason: Error) => void) | undefined;
+  const interrupted = new Promise<never>((_resolve, reject) => { rejectInterrupted = reject; });
+  const abort = () => rejectInterrupted?.(new DOMException("Export canceled.", "AbortError"));
+  signal?.addEventListener("abort", abort, { once: true });
+  let timedOut = false;
+  const timeout = globalThis.setTimeout(() => {
+    timedOut = true;
+    rejectInterrupted?.(new Error("Image decoding timed out."));
+  }, imageTimeoutMs);
+  try {
+    image.src = dataUri;
+    await Promise.race([image.decode(), interrupted]);
+    throwIfAborted(signal);
+  } catch {
+    throwIfAborted(signal);
+    if (timedOut) throw new Error(`Image decoding timed out after 10 seconds: ${mime}.`);
+    throw new Error(`Image data could not be decoded: ${mime}. The image may be damaged or incomplete.`);
+  } finally {
+    globalThis.clearTimeout(timeout);
+    signal?.removeEventListener("abort", abort);
+    image.src = "";
+  }
 }
 
 function assertEmbeddedResources(html: string): void {

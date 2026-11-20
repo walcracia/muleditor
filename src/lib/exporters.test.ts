@@ -124,6 +124,59 @@ describe("standalone Markdown export", () => {
     await expect(buildSmartExport(tab('<img src="https://example.com/large.png">'))).rejects.toThrow("10 MiB");
   });
 
+  it("rejects a successful image/png response whose body is actually HTML", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("<html>not an image</html>", { headers: { "content-type": "image/png" } })));
+    await expect(buildSmartExport(tab('<img src="https://example.com/error.png">'))).rejects.toThrow("does not match its declared type");
+  });
+
+  it.each([
+    "image/png", "image/jpeg", "image/gif", "image/webp", "image/bmp", "image/x-icon", "image/vnd.microsoft.icon", "image/avif"
+  ])("rejects non-image bytes claiming to be %s", async (mime) => {
+    mocks.resolveMarkdownImage.mockResolvedValue(`data:${mime};base64,${btoa("invalid binary image data pretending to be an image")}`);
+    await expect(buildSmartExport(tab('<img src="invalid-image.bin">'))).rejects.toThrow("does not match its declared type");
+  });
+
+  it("uses the browser decoder to reject a truncated image with a valid signature", async () => {
+    const decode = vi.fn().mockRejectedValue(new DOMException("The source image cannot be decoded.", "EncodingError"));
+    vi.stubGlobal("Image", class { src = ""; decode = decode; });
+    const truncated = btoa(String.fromCharCode(...pngBytes.slice(0, 32)));
+    mocks.resolveMarkdownImage.mockResolvedValue(`data:image/png;base64,${truncated}`);
+    await expect(buildSmartExport(tab('<img src="truncated.png">'))).rejects.toThrow("damaged or incomplete");
+    expect(decode).toHaveBeenCalledOnce();
+  });
+
+  it("keeps valid raster bytes after the browser decoder succeeds", async () => {
+    const decode = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal("Image", class { src = ""; decode = decode; });
+    mocks.resolveMarkdownImage.mockResolvedValue(png);
+    const payload = await buildSmartExport(tab('<img src="valid.png">'));
+    expect(new DOMParser().parseFromString(payload.content, "text/html").querySelector("img")?.src).toBe(png);
+    expect(decode).toHaveBeenCalledOnce();
+  });
+
+  it("accepts AVIF compatible brands and rejects non-AVIF ISO media", async () => {
+    const bytes = Uint8Array.from([0, 0, 0, 24, ...Array.from("ftypmif1"), 0, 0, 0, 0, ...Array.from("avifmif1")], (value) => typeof value === "string" ? value.charCodeAt(0) : value);
+    const decode = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal("Image", class { src = ""; decode = decode; });
+    mocks.resolveMarkdownImage.mockResolvedValue(`data:image/avif;base64,${btoa(String.fromCharCode(...bytes))}`);
+    await expect(buildSmartExport(tab('<img src="valid.avif">'))).resolves.toMatchObject({ mimeType: "text/html" });
+    bytes.set(Array.from("isom", (value) => value.charCodeAt(0)), 16);
+    mocks.resolveMarkdownImage.mockResolvedValue(`data:image/avif;base64,${btoa(String.fromCharCode(...bytes))}`);
+    await expect(buildSmartExport(tab('<img src="video.avif">'))).rejects.toThrow("does not match its declared type");
+  });
+
+  it("preserves cancellation while browser image decoding is pending", async () => {
+    const decode = vi.fn(() => new Promise<void>(() => {}));
+    vi.stubGlobal("Image", class { src = ""; decode = decode; });
+    mocks.resolveMarkdownImage.mockResolvedValue(png);
+    const controller = new AbortController();
+    const pending = buildSmartExport(tab('<img src="valid.png">'), { signal: controller.signal });
+    const rejected = expect(pending).rejects.toMatchObject({ name: "AbortError" });
+    await vi.waitFor(() => expect(decode).toHaveBeenCalledOnce());
+    controller.abort();
+    await rejected;
+  });
+
   it("times out remote images and preserves caller cancellation", async () => {
     vi.useFakeTimers();
     vi.stubGlobal("fetch", vi.fn().mockImplementation((_url, options) => new Promise((_resolve, reject) => {
