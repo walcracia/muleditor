@@ -1776,6 +1776,8 @@ dependencies = [
 name = "muleditor"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
+ "percent-encoding",
  "serde",
  "tauri",
  "tauri-build",
