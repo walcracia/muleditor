@@ -28,6 +28,7 @@
 .markdownBody h4,
 .markdownBody h5,
 .markdownBody h6 {
+  position: relative;
   margin-block: 1.3em 0.45em;
   line-height: 1.3;
   font-weight: 650;
@@ -50,7 +51,11 @@
 }
 .markdownBody .header-anchor,
 .markdownBody .heading-anchor {
-  margin-inline-start: 0.4em;
+  position: absolute;
+  inset-inline-start: -1em;
+  inset-block-start: 0.2em;
+  margin-inline-start: 0;
+  font-size: 0.7em;
   color: #66788d;
   text-decoration: none;
 }

@@ -15,6 +15,7 @@
 - 保持文档编辑工作台定位，前端编排在 `src/App.tsx`，格式能力优先扩展 `src/lib/formatAdapters.ts` 及现有分析/引用模块，桌面文件能力在 `src-tauri/src/lib.rs`。
 - UI 文本同步中文/英文；保持文件内容、dirty 状态、保存行为、预览与只读比较的正确性。
 - Monaco 当前固定 `0.56.0`；升级时同步 npm 依赖、锁文件和 `src/main.tsx` 中 CDN 版本，核查 Diff 组件生命周期。
+- Markdown 预览与 HTML 导出必须共用 `src/lib/markdown.ts` 的完整渲染管线；标题锚点、大纲与引用复用标题解析。改动公式/图表/图片时同时验证导出后的独立 HTML，不能只验证预览。样式源为 `src/markdown.css`。
 - 依赖变动提交 `package-lock.json` 和相应 `Cargo.lock`；不要只改版本声明。正式发布的 npm、Cargo 和 Tauri 项目版本一致。
 - 不提交 `node_modules/`、`dist/`、`src-tauri/target/`、生成的 schema、`release/`、本机 `.codex/` 状态、凭据、`.env` 或私钥。必要的脱敏验证截图放 `docs/assets/`，不要依赖未跟踪的临时输出。
 - 不覆盖其他 agent 的未提交工作；并行 agent 使用独立分支/工作树，明确负责文件。合并远端变更时保留双方内容并重新验证，不使用强推、`reset --hard` 或清理命令掩盖冲突。
@@ -27,11 +28,14 @@
 npm ci
 npm run check
 npm run build
+npm test
 cargo check --manifest-path src-tauri/Cargo.toml --locked
 cargo test --manifest-path src-tauri/Cargo.toml --locked
 ```
 
 根据改动执行必要验证，不为纯文档改动重复无关测试。涉及界面交互时增加真实操作验证；涉及桌面、Tauri 配置或发布时运行 `npm run tauri:build -- --no-sign`，并使用 `scripts/package-release.ps1` 生成下载包。记录执行环境、命令、结果、未执行项和原因。历史截图和历史“passed”不能充当本次验证证据；失败或缺少环境不得写成通过。
+
+Markdown 浏览器回归：构建后执行 `npx playwright install chromium`、`npm run test:e2e`；已有 Edge 的 Windows 本机可临时设置 `PLAYWRIGHT_CHANNEL=msedge`。测试必须检查实际下载 HTML 在离线状态下的公式、图表、字体和本地图片，以及 HTML 净化和快速标签切换。
 
 ## 每次结束与交接
 

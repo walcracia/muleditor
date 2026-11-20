@@ -2,6 +2,12 @@
 
 本地文件优先的多格式文档编辑器，使用 Tauri 2、React、TypeScript、Vite 和 Monaco。支持 Markdown、HTML、XML、YAML、JSON 和 SPDX 文档的编辑、预览、格式化、基础诊断、目录导航及只读文件比较。
 
+Markdown 支持 KaTeX 公式（`$...$`、`$$...$$`、`\(...\)`、`\[...\]` 及 `math` 代码块）、预览代码高亮、脚注、标题锚点与 Mermaid。标题大纲和链接共用语法解析，重复标题生成独立锚点；原始 HTML 经过净化。
+
+本地图片使用相对于 Markdown 文件的路径；桌面模式直接读取，浏览器模式请导入包含文档和图片的文件夹，或同时选择文档及图片。每张图最大 10 MiB。浏览器不能读取未选择的本机文件；同名目录重新导入会替换该目录的文件映射。
+
+导出的 HTML 复用完整渲染流程，内嵌图片、图表、代码样式和 KaTeX 字体，可独立离线查看；隐藏预览也能导出。缺失、损坏、超限或无法内联的图片会明确阻止导出，便于修正后重试。
+
 代码与交接的统一入口：[walcracia/muleditor](https://github.com/walcracia/muleditor)。任何电脑和 AI agent 都从仓库中的版本、设计与交接记录恢复工作。
 
 ## 下载与使用
@@ -39,6 +45,7 @@ git switch -c agent/my-task
 npm ci
 npm run check
 npm run build
+npm test
 ```
 
 仅调试前端：
@@ -78,6 +85,8 @@ pwsh -NoProfile -File ./scripts/package-release.ps1 -SourceCommit $sourceCommit
 | `src/lib/fileAccess.ts`、`exporters.ts` | 桌面文件桥接、浏览器下载与导出 |
 | `src/lib/i18n.ts` | 中文/英文界面文本 |
 | `src/main.tsx` | React 启动与 Monaco 运行时版本 |
+| `src/lib/markdown.ts`、`markdownSanitize.ts`、`mermaid.ts` | Markdown 标题/脚注解析、统一渲染、HTML/SVG 净化和图表 |
+| `src/lib/markdownResources.ts`、`markdownExportStyles.ts`、`src/markdown.css` | 图片解析、自包含导出字体和共享阅读样式 |
 | `src-tauri/src/lib.rs` | 文件/文件夹读取、保存、启动参数、拖放与 HTML 预览窗口 |
 | `src-tauri/tauri.conf.json` | 桌面窗口、版本、端口和打包配置 |
 | `.github/workflows/`、`scripts/` | 持续验证、下载产物与发布流程 |

@@ -1,5 +1,6 @@
 import YAML, { isMap, isNode, isScalar, isSeq, LineCounter } from "yaml";
 import { summarizeSpdx } from "./spdx";
+import { extractMarkdownHeadings } from "./markdown";
 import type { Diagnostic, DocumentAnalysis, DocumentFormat, OutlineItem } from "../types";
 
 export function analyzeMarkdown(content: string): DocumentAnalysis {
@@ -154,18 +155,12 @@ export function analyzeText(): DocumentAnalysis {
 }
 
 function outlineMarkdown(content: string): OutlineItem[] {
-  const items: OutlineItem[] = [];
-  content.split(/\r?\n/).forEach((line, index) => {
-    const match = /^(#{1,6})\s+(.+)$/.exec(line);
-    if (!match) return;
-    items.push({
-      id: `md-${index}`,
-      label: match[2].trim(),
-      kind: `H${match[1].length}`,
-      line: index + 1
-    });
-  });
-  return items;
+  return extractMarkdownHeadings(content).map((heading) => ({
+    id: heading.id,
+    label: heading.text,
+    kind: `H${heading.level}`,
+    line: heading.line
+  }));
 }
 
 function analyzeSpdxTagValue(content: string): DocumentAnalysis {

@@ -34,8 +34,14 @@ jobs:
         run: ./scripts/package-release.ps1 -ValidateOnly
       - name: Type check
         run: npm run check
+      - name: Test Markdown rendering and export
+        run: npm test
       - name: Build frontend
         run: npm run build
+      - name: Install browser for UI regression
+        run: npx playwright install chromium
+      - name: Verify preview and downloaded HTML
+        run: npm run test:e2e
       - name: Install stable Rust
         run: rustup toolchain install stable --profile minimal
       - name: Test Rust backend

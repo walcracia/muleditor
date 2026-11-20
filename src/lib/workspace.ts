@@ -1,5 +1,6 @@
 import type { Diagnostic, DocumentFormat, DocumentTab, FormatNavigationInfo, WorkspaceDeclaration, WorkspaceIndex, WorkspaceReference } from "../types";
 import { getFormatAdapter } from "./formatAdapters";
+import { extractMarkdownHeadings } from "./markdown";
 
 export function buildWorkspaceIndex(tabs: DocumentTab[]): WorkspaceIndex {
   const declarationsByTab: Record<string, WorkspaceDeclaration[]> = {};
@@ -101,7 +102,8 @@ function findTargetTab(targetPath: string, fromTab: DocumentTab | undefined, tab
 }
 
 function resolveFragmentLine(tab: DocumentTab, fragment: string, declarations: WorkspaceDeclaration[]): number | undefined {
-  const cleaned = decodeURIComponent(fragment.replace(/^#/, ""));
+  let cleaned = fragment.replace(/^#/, "");
+  try { cleaned = decodeURIComponent(cleaned); } catch { /* Keep malformed fragments literal. */ }
   if (!cleaned) return 1;
 
   const direct = declarations.find((declaration) => declaration.tabId === tab.id && declaration.name === cleaned);
@@ -130,11 +132,7 @@ function resolveFragmentLine(tab: DocumentTab, fragment: string, declarations: W
   }
 
   if (tab.format === "markdown") {
-    const heading = lines.findIndex((line) => {
-      const match = /^(#{1,6})\s+(.+)$/.exec(line);
-      return match ? slug(match[2].trim()) === cleaned : false;
-    });
-    if (heading >= 0) return heading + 1;
+    return extractMarkdownHeadings(tab.content).find((heading) => heading.id === cleaned)?.line;
   }
 
   return undefined;
@@ -202,13 +200,6 @@ function normalizePath(path: string): string {
   return path.replace(/\\/g, "/").replace(/^\.\/+/, "").toLowerCase();
 }
 
-function slug(value: string): string {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/[^\w\u4e00-\u9fff]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
 
 function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

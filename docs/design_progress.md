@@ -1,6 +1,6 @@
 # 哞-编辑器 Design And Progress
 
-Last updated: 2026-11-07 Asia/Shanghai
+Last updated: 2026-11-20 Asia/Shanghai
 
 ## AI 迭代、多电脑交接与下载发布（长期设计约束）
 
@@ -192,7 +192,9 @@ Use React + Vite for the UI.
 Key libraries:
 - `@monaco-editor/react` for editor integration
 - `@tauri-apps/api` for desktop IPC
-- `marked` for Markdown preview
+- `markdown-it` plus anchor/footnote/task-list plugins for Markdown parsing and navigation
+- KaTeX and highlight.js for formulas and preview code highlighting
+- DOMPurify for Markdown HTML/SVG purification
 - `prettier` plus parser plugins for formatting
 - `yaml` for YAML parsing
 
@@ -259,6 +261,17 @@ Known implementation boundary:
 - Full Tauri desktop build now works on this machine after installing Rustup and using a local mirror for Tauri bundler tools.
 
 ## Progress Log
+
+### 2026-11-20 Markdown 统一渲染与自包含导出
+
+- 保留 React、Monaco、多格式工作台、原生文件操作和只读 Diff；Markdown 语法层切到 markdown-it，接入 KaTeX、代码高亮、脚注和稳定的标题锚点。
+- 标题提取、预览、工作区 Markdown 引用共用解析器，覆盖重复标题、Setext 标题、代码围栏及 Front Matter 行号偏移。编辑、预览和导出均不改写文档原文。
+- 渲染器提供统一的异步 `renderMarkdownDocument`；先净化用户 HTML，再渲染公式、图表与图片，最后净化输出。切换标签或连续编辑取消过期任务。
+- 通过受限的 Rust 图片读取命令和浏览器已导入文件映射解析相对图片，生成 data URI；不扩大 Tauri asset 协议访问范围。读取限制、缺失图片和导出错误应可见。
+- 导出独立调用同一渲染管线，包含 Mermaid SVG、KaTeX、脚注、代码高亮、共享样式、内联图片与 WOFF2 字体。图片不能内联时明确失败，不生成静默缺图的文件。
+- 渲染/净化/资源/导出/导航共 65 个前端测试通过，Rust 9 个测试通过；3 组真实 Edge 浏览器回归通过，覆盖下载 HTML 离线显示、快速切换、最小窗口、预览链接和 JSON 导出。`npm ci`、类型检查和生产构建通过。
+- 导出图片通过签名与实际解码检查，读取/解码有超时，阻止伪图片和截断图片悄悄进入交付物；原生保存取消恢复状态。
+- 截图：`docs/assets/markdown-rendering-0.2.0.png`、`docs/assets/markdown-minimum-window-0.2.0.png`。版本为 `0.2.0`；云端检查和发布结果在完成后写入 HANDOFF。
 
 ### 2026-11-07 GitHub 与多电脑 AI 交接基础设施
 

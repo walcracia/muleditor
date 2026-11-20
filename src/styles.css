@@ -706,6 +706,18 @@ button {
   line-height: 1.6;
 }
 
+.markdownPreviewMessage {
+  margin: 12px 24px;
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.markdownPreviewMessage[role="alert"] {
+  color: #991b1b;
+}
+
 .markdownPreview h1,
 .markdownPreview h2,
 .markdownPreview h3 {

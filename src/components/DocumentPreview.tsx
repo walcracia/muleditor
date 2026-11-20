@@ -1,24 +1,71 @@
-import { useEffect, useRef } from "react";
-import { marked } from "marked";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ExternalLink } from "lucide-react";
 import type { DocumentAnalysis, DocumentTab, OutlineItem, OutlineNavigationCommand } from "../types";
 import type { Locale } from "../lib/i18n";
 import { text } from "../lib/i18n";
-import { stripFrontMatter } from "../lib/markdown";
-import { renderMermaidBlocks } from "../lib/mermaid";
+import { renderMarkdownDocument } from "../lib/markdown";
+import { resolveMarkdownImage } from "../lib/markdownResources";
 
 interface DocumentPreviewProps {
   tab: DocumentTab;
   analysis: DocumentAnalysis;
   locale: Locale;
   navigation?: OutlineNavigationCommand;
+  resourceVersion?: number;
+  onOpenLocalLink: (href: string) => void;
   onOpenHtmlPreview: () => void;
 }
 
-export function DocumentPreview({ tab, analysis, locale, navigation, onOpenHtmlPreview }: DocumentPreviewProps) {
+export function DocumentPreview({ tab, analysis, locale, navigation, resourceVersion = 0, onOpenLocalLink, onOpenHtmlPreview }: DocumentPreviewProps) {
   const previewRef = useRef<HTMLElement | null>(null);
   const htmlFrameRef = useRef<HTMLIFrameElement | null>(null);
   const appliedNavigationRef = useRef<number>();
+  const renderKey = useMemo(() => ({}), [tab.id, tab.content, tab.path, tab.relativePath, tab.workspaceRoot, locale, resourceVersion]);
+  const [markdown, setMarkdown] = useState<{
+    key: object;
+    tabId: string;
+    html: string;
+    warnings: string[];
+    pending: boolean;
+    error?: string;
+  }>();
+  const currentMarkdown = markdown?.key === renderKey ? markdown : undefined;
+
+  useEffect(() => {
+    if (tab.format !== "markdown") return;
+    const controller = new AbortController();
+    setMarkdown((current) => ({
+      key: renderKey,
+      tabId: tab.id,
+      html: current?.tabId === tab.id ? current.html : "",
+      warnings: [],
+      pending: true
+    }));
+    const timer = window.setTimeout(() => {
+      void renderMarkdownDocument(tab.content, {
+        signal: controller.signal,
+        errorLabel: text(locale, "preview.mermaidError"),
+        resolveImage: (src) => resolveMarkdownImage(src, {
+          sourcePath: tab.path,
+          relativePath: tab.relativePath,
+          workspaceRoot: tab.workspaceRoot
+        })
+      }).then((result) => {
+        if (!controller.signal.aborted) {
+          setMarkdown({ key: renderKey, tabId: tab.id, ...result, pending: false });
+        }
+      }).catch((error: unknown) => {
+        if (!controller.signal.aborted) {
+          setMarkdown({ key: renderKey, tabId: tab.id, html: "", warnings: [], pending: false,
+            error: error instanceof Error ? error.message : String(error) });
+        }
+      });
+    }, 120);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [renderKey, tab.id, tab.content, tab.format, tab.path, tab.relativePath, tab.workspaceRoot, locale]);
 
   useEffect(() => {
     if (!navigation || navigation.tabId !== tab.id || appliedNavigationRef.current === navigation.id) return;
@@ -26,6 +73,7 @@ export function DocumentPreview({ tab, analysis, locale, navigation, onOpenHtmlP
     let navigated = false;
 
     if (tab.format === "markdown") {
+      if (!currentMarkdown || currentMarkdown.pending) return;
       const headings = Array.from(previewRef.current?.querySelectorAll<HTMLElement>("h1,h2,h3,h4,h5,h6") ?? []);
       bindOutlineIds(headings, analysis.outline);
       navigated = scrollToOutline(previewRef.current, navigation.outlineId);
@@ -36,29 +84,44 @@ export function DocumentPreview({ tab, analysis, locale, navigation, onOpenHtmlP
     }
 
     if (navigated) appliedNavigationRef.current = navigation.id;
-  }, [navigation?.id, tab.id]);
-
-  useEffect(() => {
-    const preview = previewRef.current;
-    if (tab.format !== "markdown" || !preview) return;
-
-    const controller = new AbortController();
-    const timer = window.setTimeout(() => {
-      void renderMermaidBlocks(preview, {
-        errorLabel: text(locale, "preview.mermaidError"),
-        signal: controller.signal
-      });
-    }, 160);
-
-    return () => {
-      window.clearTimeout(timer);
-      controller.abort();
-    };
-  }, [locale, tab.content, tab.format, tab.id]);
+  }, [navigation, tab.id, tab.format, analysis.outline, currentMarkdown?.html, currentMarkdown?.pending]);
 
   if (tab.format === "markdown") {
-    const html = marked.parse(stripFrontMatter(tab.content), { async: false }) as string;
-    return <article ref={previewRef} className="preview markdownPreview" dangerouslySetInnerHTML={{ __html: html }} />;
+    return (
+      <section className="preview markdownPreviewShell" aria-busy={currentMarkdown?.pending ?? true}>
+        {currentMarkdown?.error ? <p className="markdownPreviewMessage" role="alert">
+          {text(locale, "preview.renderError", { reason: currentMarkdown.error })}
+        </p> : null}
+        {currentMarkdown?.warnings.length ? <p className="markdownPreviewMessage" role="status">
+          {text(locale, "preview.renderWarnings", { details: currentMarkdown.warnings.join("; ") })}
+        </p> : null}
+        {!currentMarkdown?.html && !currentMarkdown?.error && currentMarkdown?.pending !== false ? (
+          <p className="markdownPreviewMessage" role="status">{text(locale, "preview.rendering")}</p>
+        ) : null}
+        <article
+          ref={previewRef}
+          className="markdownBody markdownPreview"
+          onClick={(event) => {
+            const anchor = event.target instanceof Element ? event.target.closest("a") : null;
+            const href = anchor?.getAttribute("href");
+            if (!href) return;
+            if (!href.startsWith("#")) {
+              if (/^(?:https?:|mailto:|tel:|\/\/)/i.test(href)) return;
+              event.preventDefault();
+              onOpenLocalLink(href);
+              return;
+            }
+            event.preventDefault();
+            let id = href.slice(1);
+            try { id = decodeURIComponent(id); } catch { /* Keep a literal malformed fragment. */ }
+            const target = Array.from(previewRef.current?.querySelectorAll<HTMLElement>("[id]") ?? [])
+              .find((element) => element.id === id);
+            target?.scrollIntoView({ block: "start", behavior: "auto" });
+          }}
+          dangerouslySetInnerHTML={{ __html: currentMarkdown?.html ?? "" }}
+        />
+      </section>
+    );
   }
 
   if (tab.format === "html") {

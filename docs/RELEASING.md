@@ -15,6 +15,7 @@
 npm ci
 npm run check
 npm run build
+npm test
 cargo test --locked --manifest-path src-tauri/Cargo.toml
 npm run tauri:build -- --no-sign
 ```
@@ -52,6 +53,8 @@ pwsh -NoProfile -File scripts/package-release.ps1 -TargetDir ..\environment\carg
 生成物不提交到 Git。正式文件通过 GitHub Release 下载，过程文件通过 Actions Artifacts 下载。目前使用 `--no-sign`，便携 EXE 与安装包均未做 Windows 代码签名。脚本只打包现有文件，不能证明文件由指定提交编译；正式流程必须从干净的指定 tag 重新构建。
 
 ## 持续验证与过程下载
+
+当前 CI 也运行 `npm test`，再安装 Playwright Chromium 并执行 `npm run test:e2e`，验证预览与实际下载 HTML。Windows 本机已有 Edge 时可以临时设置 `$env:PLAYWRIGHT_CHANNEL = 'msedge'`，有网络代理需求时可设置 `PLAYWRIGHT_PROXY`，不要把本机代理地址提交进项目配置。
 
 [CI 工作流](../.github/workflows/ci.yml) 在分支 push、pull request 和手动触发时运行 Windows 检查：锁定依赖安装、版本一致性、TypeScript 检查、前端构建与 Rust 测试。成功后上传 `muleditor-web-<commit>`，内容为 `dist/`，保留 30 天。这是浏览器构建，不是 Windows 安装程序，需要通过 HTTP 服务器运行。
 

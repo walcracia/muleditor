@@ -1,4 +1,5 @@
 import type { DocumentTab, WorkspaceDeclaration, WorkspaceReference } from "../types";
+import { extractMarkdownAnchors } from "./markdown";
 
 const LOCAL_TARGET_PATTERN = /\.(?:md|markdown|html?|xml|xsd|dtd|ya?ml|json|spdx)(?:[?#].*)?$/i;
 
@@ -10,11 +11,8 @@ export function collectMarkdownDeclarations(tab: DocumentTab): WorkspaceDeclarat
     declarations.push(makeDeclaration(tab, "front-matter", "front matter", "Front matter", "front matter", 1));
   }
 
-  lines.forEach((line, index) => {
-    const match = /^(#{1,6})\s+(.+)$/.exec(line);
-    if (!match) return;
-    const label = match[2].trim();
-    declarations.push(makeDeclaration(tab, `heading-${index}`, slug(label), label, `H${match[1].length}`, index + 1));
+  extractMarkdownAnchors(tab.content).forEach((anchor, index) => {
+    declarations.push(makeDeclaration(tab, `markdown-anchor-${index}`, anchor.id, anchor.text, anchor.kind, anchor.line));
   });
 
   return declarations;
@@ -94,6 +92,9 @@ export function collectMarkdownReferences(tab: DocumentTab): WorkspaceReference[
     const linkPattern = /(!?)\[[^\]]*]\(([^)]+)\)/g;
     let match: RegExpExecArray | null;
     while ((match = linkPattern.exec(line))) {
+      // Images are resolved by the shared renderer, including files which are
+      // not editor tabs. The workspace rail only navigates text documents.
+      if (match[1]) continue;
       const target = firstToken(match[2]);
       if (!isLocalTarget(target)) continue;
       references.push(makeReference(tab, match[1] ? "image" : "link", match[1] ? "Image" : "Link", target, index + 1, match.index + 1));

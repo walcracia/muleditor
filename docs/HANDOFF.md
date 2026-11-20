@@ -1,6 +1,6 @@
 # MulEditor 跨电脑 AI 交接
 
-更新时间：2026-11-07（Asia/Shanghai）。本文件保存当前状态；长期设计和历史验证保存在 [design_progress.md](design_progress.md)。
+更新时间：2026-11-20（Asia/Shanghai）。本文件保存当前状态；长期设计和历史验证保存在 [design_progress.md](design_progress.md)。
 
 ## 接班入口与三项原则
 
@@ -12,7 +12,22 @@
 
 每次结束都检查这三项，并更新本文当前状态与设计文档中的相应记录。
 
-## 当前交接：GitHub 迁移与可持续迭代
+## 当前交接：Markdown 统一渲染与导出
+
+- 用户范围：保留 React、Monaco、多格式架构，补公式、预览代码高亮、脚注、标题锚点、本地图片、HTML 净化，并统一预览和导出以保留图表/样式。
+- 工作分支：`agent/markdown-rendering`；基线 `e31d737b33d230c4a0991527aa05c9689e175372`。三个子任务在独立 worktree/分支实施，合并前不共享未提交源码。
+- 本次版本 `0.2.0`，尚待发布；稳定下载仍为下述 `v0.1.0`。
+- 当前状态：实现已整合；`npm ci`、类型检查、生产构建、65 个前端测试、9 个 Rust 测试和 3 组真实 Edge 浏览器回归通过。Windows EXE/NSIS 构建通过，云端 CI/发布仍待确认。
+- 下一步：完成 Windows 包核验，提交并推送源码/文档，再发布 `v0.2.0`；等待 CI 与 Release 成功后实际下载核验并回填。历史记录不能代替本次证据。
+- 模块：`markdown.ts` 统一渲染和同步标题/脚注锚点解析；`markdownSanitize.ts` 净化用户 HTML 与生成的公式/SVG；`markdownResources.ts` 对接 Rust/浏览器 File；`exporters.ts`、`markdownExportStyles.ts` 生成自包含 HTML，`src/markdown.css` 同时用于预览/导出。
+- 本次覆盖：KaTeX 四种分隔符和 math fence、代码高亮/未知语言回退、脚注/返回链接、中文/重复/Setext 标题、Front Matter 行号、Mermaid/HTML 净化、本地图片/字体离线内联、预览隐藏导出、快速切换、链接不离开工作台及 JSON 导出。
+- 本次边界：完整安装器安装过程和全格式桌面 UI 尚未逐项回归。Monaco 保留原 CDN 加载方式，应用编辑区仍需访问 jsDelivr；导出 HTML 可离线查看。
+- 原生验证：新 EXE 从启动参数打开测试 Markdown，窗口标题/版本正确且响应正常；真实 WebView2 窗口中观察到 Monaco 源码、公式、代码高亮、Mermaid 图、脚注和本地图片元素，引用诊断正常。只关闭了本次创建的测试进程。
+- 资源限制：本地图片只接受相对路径，支持 `../` 和中文/空格/编码文件名，每图 10 MiB；导出图片合计 50 MiB，远程图片需允许浏览器跨源读取，读取/解码 10 秒超时；SVG 外部依赖、未支持的媒体和缺图会明确阻止导出。
+- 浏览器不同导入根互相隔离，同名根重新导入替换映射；普通多选保留图片，同名图片以最后选择为准。图片由预览检查，不匹配文本标签误报。
+- 安全依赖：直接渲染使用锁定 DOMPurify；非破坏性修复已消除高危告警，现有 Monaco/Mermaid 嵌套依赖仍有 1 中危/3 低危告警，未强制降级 Monaco 或升级 Mermaid 主版本。
+
+## 上一次交接：2026-11-07 GitHub 迁移
 
 - 仓库：<https://github.com/walcracia/muleditor>。
 - 当前项目版本：`0.1.0`。
@@ -25,12 +40,12 @@
 
 ## 源码当前状态
 
-- 技术：Tauri 2 + React 18 + TypeScript + Vite + Monaco `0.56.0`，npm 与 Cargo 锁文件均为复现依赖所需源码。
+- 技术：Tauri 2 + React 18 + TypeScript + Vite + Monaco `0.56.0`；Markdown 使用 markdown-it + KaTeX + highlight.js + DOMPurify，保留 npm/Cargo 锁文件。
 - 新启动只有空 `untitled.md`；首次打开/新建实际文档会替换未编辑的占位标签。
 - 支持 Markdown/Mermaid 预览、HTML 预览、JSON/YAML/XML/SPDX 基础分析、各格式导航与片段、跨文件引用索引、中英文界面。
 - 支持打开文件/目录、保存、导出、桌面启动文件参数和拖放；浏览器模式以文件选择及下载实现可用回退。
 - Diff 可比较已保存版本或其他打开文件；两侧只读，保留空白差异，使用 Monaco advanced diff 与实验性的 moved-block 显示。原文顺序不改变。
-- Rust 现有 4 个单元测试覆盖递归读目录、启动路径、拖放路径及 HTML 预览 base href。是否在本次运行通过必须看下方当次验证记录。
+- Rust 现有 9 个单元测试，新增图片路径、类型/签名、超限与 SVG 图片用法测试，本次均通过。
 
 | 任务类型 | 主要入口 |
 | --- | --- |
@@ -92,7 +107,7 @@ pwsh -NoProfile -File ./scripts/package-release.ps1 -SourceCommit $sourceCommit
 - 目前下载目标为 Windows x64；macOS/Linux 原生包尚未验证。
 - 当前包未签名；发布时须如实说明签名状态。
 - 历史构建有 Monaco/Mermaid 相关的 chunk 大小警告。优化包体时避免破坏 worker、预览和模型释放。
-- 尚无完整、可持续运行的自动 UI 回归集；历史 Playwright 截图是历史证据，不证明本次行为。
+- 已有持续运行的 Markdown 预览/HTML 导出和 JSON 导出 Playwright 回归；其他格式与完整桌面 UI 按改动范围补验证。历史截图不证明本次行为。
 - 原生目录导入当前最多 1000 个文件、每个文件最多 5 MiB；工作区会话尚未持久化，目前只持久化界面语言。
 
 迁移完成后，下个 agent 先复现基线、核对当前 UI 和下载包，再根据用户下一项需求选择任务；上述候选任务没有自动替代用户优先级。
@@ -118,7 +133,7 @@ Git 状态：已推送分支；未提交内容及归属（如有）
 三项检查：AI 可复现 / 跨电脑可接班 / 产物可下载
 ```
 
-## 本次验证与发布记录
+## 历史验证与发布记录：2026-11-07 v0.1.0
 
 - 日期：2026-11-07（Asia/Shanghai）；Windows x64，Node `22.14.0`、npm `10.9.2`、Rust/Cargo `1.99.1`。
 - `npm ci --prefer-offline --no-audit --no-fund`：通过；`npm run check`、`npm run build`：通过，保留已有大于 500 kB 的 chunk 警告。

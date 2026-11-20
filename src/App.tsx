@@ -10,6 +10,7 @@ import { StatusBar } from "./components/StatusBar";
 import { Toolbar } from "./components/Toolbar";
 import { analyzeDocument } from "./lib/analyze";
 import { buildSmartExport, downloadTextFile } from "./lib/exporters";
+import { registerBrowserMarkdownFiles } from "./lib/markdownResources";
 import { getFormatAdapter } from "./lib/formatAdapters";
 import {
   openDroppedPathsFromDesktop,
@@ -57,6 +58,7 @@ export function App() {
   const [diffSourceId, setDiffSourceId] = useState<string>();
   const [showInspector, setShowInspector] = useState(true);
   const [isDragActive, setIsDragActive] = useState(false);
+  const [markdownResourceVersion, setMarkdownResourceVersion] = useState(0);
   const [status, setStatus] = useState(() => text(initialLocale(), "status.ready"));
   const [editorCommand, setEditorCommand] = useState<EditorCommand>();
   const [previewNavigation, setPreviewNavigation] = useState<OutlineNavigationCommand>();
@@ -254,12 +256,15 @@ export function App() {
   }
 
   async function handleBrowserFolder(event: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(event.target.files ?? []).filter((file) => isSupportedTextDocumentName(file.name));
+    const files = Array.from(event.target.files ?? []);
     event.target.value = "";
     await upsertBrowserFiles(files, true);
   }
 
   async function upsertBrowserFiles(files: File[], fromFolder = false) {
+    if (!files.length) return;
+    registerBrowserMarkdownFiles(files);
+    setMarkdownResourceVersion((version) => version + 1);
     const supportedFiles = files.filter((file) => isSupportedTextDocumentName(file.name));
     if (!supportedFiles.length) {
       setStatus(text(locale, "status.noSupportedFiles"));
@@ -269,7 +274,7 @@ export function App() {
     const openedFiles = await Promise.all(
       supportedFiles.map(async (file) => ({
         name: file.name,
-        relativePath: fromFolder ? file.webkitRelativePath || file.name : undefined,
+        relativePath: fromFolder ? file.webkitRelativePath || file.name : file.name,
         workspaceRoot: fromFolder ? browserWorkspaceRoot(file.webkitRelativePath) : undefined,
         content: await file.text()
       }))
@@ -382,11 +387,18 @@ export function App() {
 
   async function handleExport() {
     try {
-      const payload = buildSmartExport(activeTab);
+      setStatus(text(locale, "status.exporting", { name: activeTab.name }));
+      const payload = await buildSmartExport(activeTab, {
+        lang: locale === "zh" ? "zh-CN" : "en",
+        errorLabel: text(locale, "preview.mermaidError")
+      });
 
       if (isTauriRuntime()) {
         const path = await pickSavePath(payload.name);
-        if (!path) return;
+        if (!path) {
+          setStatus(text(locale, "status.ready"));
+          return;
+        }
         await saveTextFileToDesktop(path, payload.content);
       } else {
         downloadTextFile(payload);
@@ -394,7 +406,7 @@ export function App() {
 
       setStatus(text(locale, "status.exported", { name: payload.name }));
     } catch (error) {
-      setStatus(errorMessage(error));
+      setStatus(text(locale, "status.exportFailed", { reason: errorMessage(error) }));
     }
   }
 
@@ -467,6 +479,15 @@ export function App() {
       line: reference.resolvedLine ?? 1
     });
     setStatus(text(locale, "status.openedReference", { target: reference.rawTarget }));
+  }
+
+  function handleOpenPreviewLink(href: string) {
+    const normalize = (value: string) => {
+      try { return decodeURI(value); } catch { return value; }
+    };
+    const reference = activeFormatNav.references.find((item) => normalize(item.rawTarget) === normalize(href));
+    if (reference) handleOpenReference(reference);
+    else setStatus(text(locale, "status.unresolvedReference", { target: href }));
   }
 
   function handleInsertSnippet(snippetText: string) {
@@ -617,6 +638,8 @@ export function App() {
                 analysis={activeAnalysis}
                 locale={locale}
                 navigation={previewNavigation}
+                resourceVersion={markdownResourceVersion}
+                onOpenLocalLink={handleOpenPreviewLink}
                 onOpenHtmlPreview={handleOpenHtmlPreview}
               />
             ) : null}

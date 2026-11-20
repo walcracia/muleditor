@@ -141,6 +141,12 @@ export async function renderMarkdownDocument(
   assertNotAborted(options.signal);
   // Final purification also covers generated formulas, SVG and resolver-provided URLs.
   sanitizeMarkdownRoot(root, trusted);
+  for (const link of root.querySelectorAll<HTMLAnchorElement>("a[href]")) {
+    if (/^(?:https?:)?\/\//i.test(link.getAttribute("href") ?? "")) {
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+    }
+  }
   for (const error of root.querySelectorAll<HTMLElement>(".katex-error")) {
     warnings.push(error.getAttribute("title") || `Unable to render formula: ${error.textContent ?? ""}`);
   }

@@ -59,6 +59,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Type check failed.' }
           npm run build
           if ($LASTEXITCODE -ne 0) { throw 'Frontend build failed.' }
+      - name: Test Markdown rendering and export
+        run: npm test
       - name: Install stable Rust
         run: |
           rustup toolchain install stable --profile minimal
