@@ -80,6 +80,15 @@ describe("standalone Markdown export", () => {
     expect(payload.content).toContain("default-src 'none'");
   });
 
+  it("preserves Mermaid HTML labels inside foreignObject while removing executable attributes", async () => {
+    const input = '<div class="mermaidDiagram"><svg xmlns="http://www.w3.org/2000/svg"><foreignObject width="120" height="40"><div xmlns="http://www.w3.org/1999/xhtml"><span class="nodeLabel" onclick="alert(1)">Start <b>here</b></span><script>alert(2)</script></div></foreignObject></svg></div>';
+    const payload = await buildSmartExport(tab(input));
+    const doc = new DOMParser().parseFromString(payload.content, "text/html");
+    expect(doc.querySelector("foreignObject .nodeLabel")?.textContent).toBe("Start here");
+    expect(doc.querySelector("foreignObject .nodeLabel b")?.textContent).toBe("here");
+    expect(doc.querySelector("script, [onclick]")).toBeNull();
+  });
+
   it("resolves local images using document context and produces data URIs", async () => {
     mocks.resolveMarkdownImage.mockResolvedValue(png);
     const payload = await buildSmartExport(tab('<img src="images/local.png" alt="Local">'));
@@ -140,13 +149,15 @@ describe("standalone Markdown export", () => {
   });
 
   it("cleans embedded SVG images without adding active SVG markup to the page", async () => {
-    const svg = '<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"><script>alert(2)</script><rect width="10" height="10" /></svg>';
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"><script>alert(2)</script><rect width="10" height="10" /><foreignObject width="80" height="30"><div xmlns="http://www.w3.org/1999/xhtml"><span onclick="alert(3)">Image label</span></div></foreignObject></svg>';
     mocks.resolveMarkdownImage.mockResolvedValue(`data:image/svg+xml;base64,${btoa(svg)}`);
     const payload = await buildSmartExport(tab('<img src="diagram.svg" alt="Diagram">'));
     const doc = new DOMParser().parseFromString(payload.content, "text/html");
     const embedded = atob(doc.querySelector("img")!.src.split(",")[1]);
     expect(embedded).toContain("<rect");
-    expect(embedded).not.toMatch(/script|onload/);
+    const svgDoc = new DOMParser().parseFromString(embedded, "image/svg+xml");
+    expect(svgDoc.querySelector("foreignObject span")?.textContent).toBe("Image label");
+    expect(embedded).not.toMatch(/script|onload|onclick/);
     expect(doc.querySelector("svg")).toBeNull();
   });
 });

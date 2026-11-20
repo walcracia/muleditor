@@ -38,6 +38,8 @@ export async function buildSmartExport(tab: DocumentTab, options: SmartExportOpt
       // introduces a new HTML path. Preserve KaTeX MathML and Mermaid SVG.
       const html = DOMPurify.sanitize(rendered.html, {
         USE_PROFILES: { html: true, svg: true, svgFilters: true, mathMl: true },
+        ADD_TAGS: ["foreignObject"],
+        HTML_INTEGRATION_POINTS: { foreignobject: true, "annotation-xml": true },
         ADD_ATTR: ["target", "data-source-line", "data-outline-id", "aria-label"],
         FORBID_TAGS: ["iframe", "object", "embed", "form", "base", "link", "meta"]
       });
@@ -201,7 +203,11 @@ function validateImageDataUri(dataUri: string): { dataUri: string; bytes: number
     // An SVG data URI can still reference external images, fonts, or styles.
     // Refuse those dependencies rather than silently changing the picture.
     assertNoSvgDependencies(parsed.documentElement);
-    const sanitized = DOMPurify.sanitize(svg, { USE_PROFILES: { svg: true, svgFilters: true } });
+    const sanitized = DOMPurify.sanitize(svg, {
+      USE_PROFILES: { html: true, svg: true, svgFilters: true },
+      ADD_TAGS: ["foreignObject"],
+      HTML_INTEGRATION_POINTS: { foreignobject: true, "annotation-xml": true }
+    });
     return { dataUri: `data:image/svg+xml;base64,${encodeBase64(new TextEncoder().encode(sanitized))}`, bytes: bytes.length };
   }
   return { dataUri: `data:${mime};base64,${encodeBase64(bytes)}`, bytes: bytes.length };
