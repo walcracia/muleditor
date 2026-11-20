@@ -1,0 +1,193 @@
+/* Shared reading styles for the workbench preview and standalone HTML exports. */
+.markdownBody {
+  min-width: 0;
+  color: #1e293b;
+  font-size: 14px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+  text-underline-offset: 0.16em;
+  scrollbar-color: #a6b4c4 #edf1f5;
+}
+
+.markdownBody::selection,
+.markdownBody ::selection {
+  color: #102e52;
+  background: #c9dff9;
+}
+
+.markdownBody > :first-child { margin-block-start: 0; }
+.markdownBody > :last-child { margin-block-end: 0; }
+.markdownBody p,
+.markdownBody ul,
+.markdownBody ol,
+.markdownBody blockquote { margin-block: 0 1em; }
+
+.markdownBody h1,
+.markdownBody h2,
+.markdownBody h3,
+.markdownBody h4,
+.markdownBody h5,
+.markdownBody h6 {
+  margin-block: 1.3em 0.45em;
+  line-height: 1.3;
+  font-weight: 650;
+  scroll-margin-block: 20px;
+}
+.markdownBody h1 { font-size: 28px; }
+.markdownBody h2 { font-size: 21px; }
+.markdownBody h3 { font-size: 18px; }
+.markdownBody h4,
+.markdownBody h5,
+.markdownBody h6 { font-size: 15px; }
+
+.markdownBody a { color: #155cb3; }
+.markdownBody a:hover { color: #103e78; text-decoration-thickness: 2px; }
+.markdownBody a:focus-visible,
+.markdownBody input:focus-visible {
+  outline: 2px solid #2563b0;
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+.markdownBody .header-anchor,
+.markdownBody .heading-anchor {
+  margin-inline-start: 0.4em;
+  color: #66788d;
+  text-decoration: none;
+}
+.markdownBody .header-anchor:focus-visible,
+.markdownBody .heading-anchor:focus-visible { color: #155cb3; }
+
+.markdownBody code,
+.markdownBody pre {
+  font-family: "Cascadia Code", Consolas, "Liberation Mono", monospace;
+  font-size: 13px;
+  font-variant-ligatures: none;
+}
+.markdownBody :not(pre) > code {
+  padding: 2px 4px;
+  border-radius: 4px;
+  background: #e8edf3;
+  white-space: break-spaces;
+}
+.markdownBody pre {
+  max-width: 100%;
+  margin-block: 1em;
+  overflow: auto;
+  padding: 12px 14px;
+  border: 1px solid #dce3eb;
+  border-radius: 5px;
+  background: #f3f6fa;
+  line-height: 1.55;
+  overflow-wrap: normal;
+  tab-size: 2;
+}
+.markdownBody pre code {
+  display: block;
+  padding: 0;
+  background: transparent;
+  color: #243449;
+  white-space: pre;
+  border-radius: 0;
+}
+
+.markdownBody table {
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  margin-block: 1em;
+  overflow-x: auto;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.markdownBody th,
+.markdownBody td {
+  padding: 7px 10px;
+  border: 1px solid #d2dbe6;
+  text-align: start;
+}
+.markdownBody th { background: #edf2f7; font-weight: 650; }
+.markdownBody tr:nth-child(even) { background: #f7f9fc; }
+.markdownBody img { max-width: 100%; height: auto; vertical-align: middle; }
+.markdownBody hr { margin-block: 1.5em; border: 0; border-block-start: 1px solid #d2dbe6; }
+.markdownBody blockquote {
+  padding-inline-start: 14px;
+  border-inline-start: 1px solid #a6b4c4;
+  color: #52657a;
+}
+.markdownBody ul,
+.markdownBody ol { padding-inline-start: 1.8em; }
+.markdownBody li > p { margin-block: 0.4em; }
+.markdownBody .task-list-item { list-style: none; }
+.markdownBody .task-list-item-checkbox { margin-inline: -1.35em 0.45em; accent-color: #2563b0; }
+
+.markdownBody .katex-display {
+  max-width: 100%;
+  margin-block: 1.1em;
+  padding-block: 0.2em;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overflow-wrap: normal;
+}
+.markdownBody .katex { overflow-wrap: normal; }
+.markdownBody .mermaidDiagram {
+  margin-block: 18px;
+  overflow-x: auto;
+  padding: 14px;
+  border: 1px solid #dce3eb;
+  border-radius: 6px;
+  background: #fff;
+  overflow-wrap: normal;
+}
+.markdownBody .mermaidDiagram svg { display: block; max-width: 100%; height: auto; margin-inline: auto; }
+.markdownBody .mermaidDiagramError {
+  display: grid;
+  gap: 8px;
+  border-color: #e7b4b4;
+  background: #fff5f5;
+  color: #991b1b;
+}
+.markdownBody .mermaidDiagramError span { white-space: pre-wrap; }
+.markdownBody .mermaidDiagramError pre { margin: 4px 0 0; background: #fff; }
+.markdownBody .footnotes {
+  margin-block-start: 2em;
+  padding-block-start: 1em;
+  border-block-start: 1px solid #d2dbe6;
+  color: #52657a;
+  font-size: 14px;
+}
+.markdownBody .footnote-ref,
+.markdownBody .footnote-backref { scroll-margin-block: 20px; }
+
+/* A restrained light syntax palette, shared by preview and export. */
+.markdownBody .hljs-comment,
+.markdownBody .hljs-quote { color: #586b80; font-style: italic; }
+.markdownBody .hljs-keyword,
+.markdownBody .hljs-selector-tag,
+.markdownBody .hljs-literal,
+.markdownBody .hljs-deletion { color: #a62b45; }
+.markdownBody .hljs-string,
+.markdownBody .hljs-regexp,
+.markdownBody .hljs-addition { color: #126336; }
+.markdownBody .hljs-number,
+.markdownBody .hljs-symbol,
+.markdownBody .hljs-bullet { color: #82501b; }
+.markdownBody .hljs-title,
+.markdownBody .hljs-section,
+.markdownBody .hljs-name { color: #155cb3; }
+.markdownBody .hljs-attr,
+.markdownBody .hljs-attribute,
+.markdownBody .hljs-property,
+.markdownBody .hljs-type,
+.markdownBody .hljs-built_in { color: #6544a0; }
+.markdownBody .hljs-meta,
+.markdownBody .hljs-link { color: #35667a; }
+.markdownBody .hljs-emphasis { font-style: italic; }
+.markdownBody .hljs-strong { font-weight: 700; }
+
+@media (forced-colors: active) {
+  .markdownBody a:focus-visible,
+  .markdownBody input:focus-visible { outline-color: Highlight; }
+  .markdownBody pre,
+  .markdownBody table,
+  .markdownBody .mermaidDiagram { border-color: CanvasText; }
+}
