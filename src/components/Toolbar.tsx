@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { KeyboardEvent } from "react";
+import type { KeyboardEvent, Ref } from "react";
 import {
   CheckCircle2,
   ChevronDown,
@@ -12,6 +12,8 @@ import {
   FolderOpen,
   Languages,
   ListTree,
+  PanelBottom,
+  PanelLeft,
   PencilLine,
   Save,
   SplitSquareHorizontal,
@@ -28,7 +30,11 @@ interface ToolbarProps {
   showPreview: boolean;
   showDiff: boolean;
   showInspector: boolean;
-  status: string;
+  showWorkspace: boolean;
+  showProblems: boolean;
+  totalIssueCount: number;
+  workspaceToggleRef?: Ref<HTMLButtonElement>;
+  problemsToggleRef?: Ref<HTMLButtonElement>;
   markdownMode: "immersive" | "source";
   onMarkdownModeChange: (mode: "immersive" | "source") => void;
   onNew: (format: DocumentFormat) => void;
@@ -43,6 +49,8 @@ interface ToolbarProps {
   onTogglePreview: () => void;
   onToggleDiff: () => void;
   onToggleInspector: () => void;
+  onToggleWorkspace: () => void;
+  onToggleProblems: () => void;
   onToggleLocale: () => void;
 }
 
@@ -208,21 +216,53 @@ export function Toolbar(props: ToolbarProps) {
         </button>
           </>
         )}
-        <button type="button" onClick={props.onFormat} title={text(props.locale, "toolbar.format")}>
+        <button type="button" className="toolbarUtilityButton" onClick={props.onFormat} aria-label={text(props.locale, "toolbar.format")} title={text(props.locale, "toolbar.format")}>
           <Wand2 size={16} />
-          {text(props.locale, "toolbar.format")}
+          <span>{text(props.locale, "toolbar.format")}</span>
         </button>
-        <button type="button" onClick={props.onValidate} title={text(props.locale, "toolbar.validate")}>
+        <button type="button" className="toolbarUtilityButton" onClick={props.onValidate} aria-label={text(props.locale, "toolbar.validate")} title={text(props.locale, "toolbar.validate")}>
           <CheckCircle2 size={16} />
-          {text(props.locale, "toolbar.validate")}
+          <span>{text(props.locale, "toolbar.validate")}</span>
         </button>
-        <button type="button" className={props.showDiff ? "isActive" : ""} onClick={props.onToggleDiff} title={text(props.locale, "toolbar.diff")}>
+        <button type="button" className={props.showDiff ? "toolbarUtilityButton isActive" : "toolbarUtilityButton"} onClick={props.onToggleDiff} aria-label={text(props.locale, "toolbar.diff")} title={text(props.locale, "toolbar.diff")}>
           <SplitSquareHorizontal size={16} />
-          {text(props.locale, "toolbar.diff")}
+          <span>{text(props.locale, "toolbar.diff")}</span>
+        </button>
+      </div>
+      <div className="toolbarGroup layoutToolbarGroup">
+        <button
+          ref={props.workspaceToggleRef}
+          type="button"
+          className={props.showWorkspace ? "isActive" : ""}
+          aria-label={text(props.locale, "panel.toggleWorkspace")}
+          title={text(props.locale, "panel.toggleWorkspace")}
+          aria-expanded={props.showWorkspace}
+          aria-controls="workspacePanel"
+          onClick={props.onToggleWorkspace}
+        >
+          <PanelLeft size={16} />
+          {text(props.locale, "panel.workspace")}
+        </button>
+        <button
+          ref={props.problemsToggleRef}
+          type="button"
+          className={props.showProblems ? "isActive" : ""}
+          aria-label={text(props.locale, "panel.toggleProblems")}
+          title={text(props.locale, "panel.toggleProblems")}
+          aria-expanded={props.showProblems}
+          aria-controls="problemsPanel"
+          onClick={props.onToggleProblems}
+        >
+          <PanelBottom size={16} />
+          {text(props.locale, "panel.problems")}
+          <span className="toolbarPanelCount">{props.totalIssueCount}</span>
         </button>
         <button
           type="button"
           className={props.showInspector ? "isActive" : ""}
+          aria-pressed={props.showInspector}
+          aria-expanded={props.showInspector}
+          aria-controls="outlinePanel"
           onClick={props.onToggleInspector}
           title={text(props.locale, "toolbar.outlineTitle")}
         >
@@ -236,27 +276,6 @@ export function Toolbar(props: ToolbarProps) {
           {text(props.locale, "toolbar.language")}
         </button>
       </div>
-      <div className="formatRail" aria-label={text(props.locale, "toolbar.supportedFormats")}>
-        {["MD", "HTML", "XML", "YAML", "JSON", "SPDX"].map((label) => (
-          <span key={label} className={labelMatchesFormat(label, props.activeFormat) ? "formatChip active" : "formatChip"}>
-            {label}
-          </span>
-        ))}
-      </div>
-      <div className="toolbarStatus" title={props.status}>
-        {formatLabel(props.activeFormat, props.locale)} {text(props.locale, "toolbar.statusSeparator")} {props.status}
-      </div>
     </header>
-  );
-}
-
-function labelMatchesFormat(label: string, format: DocumentFormat): boolean {
-  return (
-    (label === "MD" && format === "markdown") ||
-    (label === "HTML" && format === "html") ||
-    (label === "XML" && format === "xml") ||
-    (label === "YAML" && format === "yaml") ||
-    (label === "JSON" && format === "json") ||
-    (label === "SPDX" && format.startsWith("spdx"))
   );
 }
