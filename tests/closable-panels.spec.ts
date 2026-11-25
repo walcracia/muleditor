@@ -90,7 +90,10 @@ test("closing panels gives space to the editor without losing content or hiding 
 
   await page.locator(".tabs .tab").filter({ hasText: "data.json" }).click();
   await problems.getByRole("button", { name: "关闭问题面板", exact: true }).click();
-  await replaceMonacoSource(page, '{"broken": }');
+  // Use unpaired text so this layout regression does not depend on Monaco's
+  // browser-specific quote/bracket auto-closing when insertText simulates typing.
+  const invalidJson = "invalid JSON";
+  await replaceMonacoSource(page, invalidJson);
   await expect(problems).toBeHidden();
   await expect(page.locator(".tabs .tab.active .tabName")).toHaveText("data.json*");
   await expect(page.locator(".statusBar")).toContainText("1 个问题");
@@ -99,7 +102,7 @@ test("closing panels gives space to the editor without losing content or hiding 
   await expect(problems.locator(".problemRow")).toHaveCount(1);
   await expect(problems.locator(".problemSource")).toHaveText("JSON");
   await expect(problems.locator(".problemFile")).toContainText("data.json");
-  expect((await downloadDocument(page)).toString("utf8")).toBe('{"broken": }');
+  expect((await downloadDocument(page)).toString("utf8")).toBe(invalidJson);
   await page.locator(".tabs .tab").filter({ hasText: "notes.md" }).click();
   await expect(editor).toContainText("保留正文。未保存的布局测试。");
 });
