@@ -1,4 +1,4 @@
-import { AlertCircle, Info, Search } from "lucide-react";
+import { AlertCircle, Info, Search, X } from "lucide-react";
 import type { Diagnostic, DocumentTab } from "../types";
 import type { Locale } from "../lib/i18n";
 import { diagnosticMessage, diagnosticSourceLabel, severityLabel, text } from "../lib/i18n";
@@ -6,13 +6,14 @@ import { diagnosticMessage, diagnosticSourceLabel, severityLabel, text } from ".
 interface ProblemsPanelProps {
   diagnosticsByTab: Array<{ tab: DocumentTab; diagnostics: Diagnostic[] }>;
   locale: Locale;
+  onClose: () => void;
 }
 
-export function ProblemsPanel({ diagnosticsByTab, locale }: ProblemsPanelProps) {
+export function ProblemsPanel({ diagnosticsByTab, locale, onClose }: ProblemsPanelProps) {
   const rows = diagnosticsByTab.flatMap(({ tab, diagnostics }) => diagnostics.map((diagnostic) => ({ tab, diagnostic })));
 
   return (
-    <footer className="bottomPanel">
+    <footer id="problemsPanel" className="bottomPanel" aria-label={text(locale, "panel.problems")}>
       <div className="bottomTabs">
         <button type="button" className="active">
           <AlertCircle size={14} />
@@ -26,6 +27,15 @@ export function ProblemsPanel({ diagnosticsByTab, locale }: ProblemsPanelProps) 
         <button type="button">
           <Info size={14} />
           {text(locale, "panel.exportLog")}
+        </button>
+        <button
+          type="button"
+          className="panelCloseButton problemsCloseButton"
+          onClick={onClose}
+          title={text(locale, "panel.closeProblems")}
+          aria-label={text(locale, "panel.closeProblems")}
+        >
+          <X size={14} />
         </button>
       </div>
       <div className="problemRows">

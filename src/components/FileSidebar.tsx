@@ -1,4 +1,4 @@
-import { FileCode2, FolderOpen } from "lucide-react";
+import { FileCode2, FolderOpen, X } from "lucide-react";
 import type { DocumentTab } from "../types";
 import type { Locale } from "../lib/i18n";
 import { formatLabel, text } from "../lib/i18n";
@@ -8,16 +8,28 @@ interface FileSidebarProps {
   activeId: string;
   locale: Locale;
   onSelect: (id: string) => void;
+  onClose: () => void;
 }
 
-export function FileSidebar({ tabs, activeId, locale, onSelect }: FileSidebarProps) {
+export function FileSidebar({ tabs, activeId, locale, onSelect, onClose }: FileSidebarProps) {
   const workspaceRoot = tabs.find((tab) => tab.workspaceRoot)?.workspaceRoot;
 
   return (
-    <aside className="sidebar">
+    <aside id="workspacePanel" className="sidebar" aria-label={text(locale, "panel.workspace")}>
       <div className="panelHeader">
-        <FolderOpen size={15} />
-        {text(locale, "panel.workspace")}
+        <span className="panelHeaderTitle">
+          <FolderOpen size={15} />
+          {text(locale, "panel.workspace")}
+        </span>
+        <button
+          type="button"
+          className="panelCloseButton"
+          onClick={onClose}
+          title={text(locale, "panel.closeWorkspace")}
+          aria-label={text(locale, "panel.closeWorkspace")}
+        >
+          <X size={14} />
+        </button>
       </div>
       {workspaceRoot ? (
         <div className="workspaceSummary" title={workspaceRoot}>
