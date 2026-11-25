@@ -26,8 +26,9 @@ export async function downloadDocument(page: Page, action: "save" | "export" = "
 export async function replaceMonacoSource(page: Page, source: string) {
   const monaco = page.locator(".monaco-editor:visible").first();
   await expect(monaco).toBeVisible();
-  const input = monaco.locator(".inputarea").first();
-  await expect(input).toBeAttached();
-  await input.press("Control+A");
+  // Monaco 0.56 uses EditContext where available, so its input may be a div.
+  await monaco.locator(".view-lines").click({ position: { x: 20, y: 10 } });
+  await expect(monaco.getByRole("textbox")).toBeFocused();
+  await page.keyboard.press("Control+A");
   await page.keyboard.insertText(source);
 }

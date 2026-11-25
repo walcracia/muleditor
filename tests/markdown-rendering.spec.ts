@@ -20,8 +20,9 @@ test("immersive Markdown and standalone export retain math, diagrams, code, note
   await expect(preview.locator("h2").filter({ hasText: "Setext 标题" })).toHaveCount(1);
   await expect(preview.locator("h1")).toHaveCount(1);
   await expect(preview.locator("unknown-code")).toHaveCount(0);
-  await expect(preview.locator("img")).toHaveAttribute("src", /^data:image\/png;base64,/);
-  expect(await preview.locator("img").evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
+  const localImage = preview.getByRole("img", { name: "本地图片", exact: true });
+  await expect(localImage).toHaveAttribute("src", /^data:image\/png;base64,/);
+  expect(await localImage.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
   await preview.getByRole("link", { name: "跳到重复标题" }).click({ modifiers: ["Control"] });
   await expect(preview.locator("h2[id='重复标题-1']")).toBeInViewport();
 

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { downloadDocument, immersiveEditor, replaceMonacoSource, switchMarkdownMode } from "./helpers/immersive";
 
@@ -31,9 +32,8 @@ test("typing and selected-text toolbar formatting update Markdown and save dirty
   const editor = immersiveEditor(page);
   await expect(editor).toBeVisible();
   const paragraph = editor.locator("p").filter({ hasText: "需要加粗的短语" }).first();
-  await paragraph.click();
-  await page.keyboard.press("Home");
-  await page.keyboard.press("Shift+End");
+  await paragraph.click({ clickCount: 3 });
+  await expect.poll(() => page.evaluate(() => getSelection()?.toString())).toBe("需要加粗的短语");
   await page.locator(".formatNavLine").getByRole("button", { name: "加粗", exact: true }).click();
   await expect(editor.locator("strong")).toHaveText("需要加粗的短语");
   await editor.press("Control+End");
@@ -88,7 +88,7 @@ test("editing one paragraph preserves adjacent formulas, diagrams, images and de
   await page.goto("/");
   await page.locator("#fileInput").setInputFiles([
     { name: "preserve.md", mimeType: "text/markdown", buffer: Buffer.from(original) },
-    path.resolve("tests/fixtures/markdown/图片.png")
+    { name: "图片.png", mimeType: "image/png", buffer: readFileSync(path.resolve("tests/fixtures/markdown/图片.png")) }
   ]);
   const editor = immersiveEditor(page);
   await expect(editor.locator(".mermaidDiagram svg")).toHaveCount(1);
@@ -137,22 +137,22 @@ test("formula and diagram forms insert and edit rendered nodes without typing Ma
   await editor.locator("p").filter({ hasText: "结尾段落。" }).click();
   await page.keyboard.press("End");
   await toolbar.getByRole("button", { name: "插入公式", exact: true }).click();
-  await form.getByLabel("公式源码", { exact: true }).fill("a^2+b^2=c^2");
+  await form.getByRole("textbox", { name: "公式源码", exact: true }).fill("a^2+b^2=c^2");
   await form.getByRole("button", { name: "应用", exact: true }).click();
   await expect(editor.locator(".immersiveNode-math_block .katex")).toHaveCount(1);
   await editor.getByRole("button", { name: /^编辑\s*公式$/ }).click();
-  await form.getByLabel("公式源码", { exact: true }).fill("\\frac{1}{2}");
+  await form.getByRole("textbox", { name: "公式源码", exact: true }).fill("\\frac{1}{2}");
   await form.getByRole("button", { name: "应用", exact: true }).click();
   await expect(editor.locator(".katex .mfrac")).toHaveCount(1);
 
   await editor.locator("p").filter({ hasText: "结尾段落。" }).click();
   await page.keyboard.press("End");
   await toolbar.getByRole("button", { name: "插入图表", exact: true }).click();
-  await form.getByLabel("图表源码", { exact: true }).fill("flowchart LR\n A[新增起点] --> B[新增终点]");
+  await form.getByRole("textbox", { name: "图表源码", exact: true }).fill("flowchart LR\n A[新增起点] --> B[新增终点]");
   await form.getByRole("button", { name: "应用", exact: true }).click();
   await expect(editor.locator(".mermaidDiagram svg")).toContainText("新增起点");
   await editor.getByRole("button", { name: /^编辑\s*图表$/ }).click();
-  await form.getByLabel("图表源码", { exact: true }).fill("flowchart TD\n A[修改后] --> B[完成]");
+  await form.getByRole("textbox", { name: "图表源码", exact: true }).fill("flowchart TD\n A[修改后] --> B[完成]");
   await form.getByRole("button", { name: "应用", exact: true }).click();
   await expect(editor.locator(".mermaidDiagram svg")).toContainText("修改后");
   await expect(editor.locator(".mermaidDiagram svg")).not.toContainText("新增起点");
