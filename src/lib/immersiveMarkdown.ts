@@ -18,7 +18,7 @@ nodes.list_item = {
 };
 nodes.code_block = { ...nodes.code_block, attrs: { ...nodes.code_block.attrs, language: { default: "" } } };
 nodes.math_block = {
-  group: "block", content: "text*", marks: "", code: true, defining: true,
+  group: "block", content: "text*", marks: "", code: true, atom: true, defining: true,
   attrs: { ...sourceAttrs, delimiter: { default: "$$" } },
   toDOM: () => ["pre", { class: "immersiveMathSource" }, ["code", 0]],
   parseDOM: [{ tag: "pre.immersiveMathSource", preserveWhitespace: "full" }]
@@ -109,7 +109,8 @@ export function parseImmersiveMarkdown(source: string): ImmersiveMarkdownSession
   const stored = new Map<string, StoredBlock>();
   const blocks: ImmersiveSourceBlock[] = [];
   const warnings: string[] = [];
-  let cursor = 0;
+  const documentPrefix = source.startsWith("\uFEFF") ? "\uFEFF" : "";
+  let cursor = documentPrefix.length;
   let prefix = "";
   let pmFrom = 0;
   const addBlock = (node: ProseMirrorNode, raw: string, from: number, to: number, line: number, endLine: number) => {
@@ -124,7 +125,7 @@ export function parseImmersiveMarkdown(source: string): ImmersiveMarkdownSession
   const addGap = (from: number, to: number) => {
     const raw = source.slice(from, to);
     if (!raw.trim()) { prefix += raw; return; }
-    const kind = from === 0 && lineOffset > 0 ? "frontmatter" : "definitions";
+    const kind = from === documentPrefix.length && lineOffset > 0 ? "frontmatter" : "definitions";
     addBlock(immersiveSchema.nodes.raw_block.create({ source: raw, kind }), raw, from, to, lineAt(lineStarts, from), lineAt(lineStarts, Math.max(from, to - 1)));
   };
   for (let index = 0; index < tokens.length;) {
@@ -133,7 +134,7 @@ export function parseImmersiveMarkdown(source: string): ImmersiveMarkdownSession
     if (token.type === "footnote_block_open") break;
     const end = blockEnd(tokens, index);
     if (!token.map) { index = end; continue; }
-    const from = lineStarts[token.map[0] + lineOffset] ?? source.length;
+    const from = Math.max(documentPrefix.length, lineStarts[token.map[0] + lineOffset] ?? source.length);
     const to = lineStarts[token.map[1] + lineOffset] ?? source.length;
     if (from < cursor || to <= from) { index = end; continue; }
     addGap(cursor, from);
@@ -164,7 +165,7 @@ export function parseImmersiveMarkdown(source: string): ImmersiveMarkdownSession
     serialize: (edited) => {
       if (edited.eq(doc)) return source;
       const used = new Set<string>();
-      let result = "";
+      let result = documentPrefix;
       let boundaryAfter = false;
       edited.forEach((node) => {
         if (node.type.name === "paragraph" && node.attrs.ephemeral && !node.content.size) return;
@@ -173,7 +174,7 @@ export function parseImmersiveMarkdown(source: string): ImmersiveMarkdownSession
         if (id) used.add(id);
         const structuralChange = !previous || previous.node.type !== node.type;
         const leading = previous?.prefix ?? "";
-        if ((boundaryAfter || structuralChange) && result && !endsWithBlankLine(result + leading)) result += newline.repeat(2 - trailingLineCount(result + leading));
+        if ((boundaryAfter || structuralChange) && result.length > documentPrefix.length && !endsWithBlankLine(result + leading)) result += newline.repeat(2 - trailingLineCount(result + leading));
         result += leading;
         if (previous && node.eq(previous.node)) result += previous.raw;
         else {

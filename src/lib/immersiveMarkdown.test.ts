@@ -36,6 +36,20 @@ describe("source-preserving immersive Markdown sessions", () => {
     expect(result).toContain('[link](./my%20path.md "Original title")');
   });
 
+  it("preserves a document BOM when the first block is edited, removed or moved", () => {
+    const source = "\uFEFFFirst  paragraph.\r\n\r\nSecond  paragraph.\r\n";
+    const session = parseImmersiveMarkdown(source);
+    expect(session.serialize(replaceText(session.doc, "First", "Edited"))).toBe(source.replace("First", "Edited"));
+    const removed = schema.nodes.doc.create(null, session.doc.child(1));
+    expect(session.serialize(removed).startsWith("\uFEFF")).toBe(true);
+    const moved = schema.nodes.doc.create(null, [session.doc.child(1), session.doc.child(0)]);
+    const serialized = session.serialize(moved);
+    expect(serialized.startsWith("\uFEFF")).toBe(true);
+    expect(serialized.match(/\uFEFF/g)).toHaveLength(1);
+    const onlyBom = parseImmersiveMarkdown("\uFEFF");
+    expect(onlyBom.serialize(EditorState.create({ doc: onlyBom.doc, schema }).tr.insertText("Text", 1).doc)).toBe("\uFEFFText");
+  });
+
   it("does not confuse duplicate paragraphs when editing, moving or copying blocks", () => {
     const session = parseImmersiveMarkdown("same  text\n\n*same text*\n\nsame  text\n");
     const edited = replaceText(session.doc, "same  text", "first edit");
@@ -84,8 +98,10 @@ describe("source-preserving immersive Markdown sessions", () => {
     expect([0, 1, 2].map((index) => list.child(index).attrs.checked)).toEqual([true, false, null]);
     expect(session.doc.child(3).content.content.map((node) => node.type.name)).toContain("inline_math");
     expect(session.doc.child(4).type.name).toBe("mermaid_block");
+    expect(session.doc.child(4).isAtom).toBe(true);
     expect(session.doc.child(4).textContent).toBe("graph LR;A-->B");
     expect(session.doc.child(5).type.name).toBe("math_block");
+    expect(session.doc.child(5).isAtom).toBe(true);
     expect(session.doc.child(5).attrs.delimiter).toBe("\\[");
   });
 
