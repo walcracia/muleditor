@@ -110,4 +110,14 @@ describe("immersive reference node views", () => {
     expect(container.querySelector(".footnote-item")?.textContent).toContain("Current tab body.");
     expect(container.textContent).not.toContain("Old tab body.");
   });
+
+  it("leaves an editable trailing paragraph after inserting an atomic block without adding blank source", async () => {
+    const value = props("");
+    await render({ ...value, command: { id: 1, action: "md-math" } });
+    await act(async () => container.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+    const editor = container.querySelector(".immersiveDocument")!;
+    expect(editor.lastElementChild?.tagName).toBe("P");
+    expect(editor.lastElementChild?.textContent).toBe("");
+    expect(value.onChange).toHaveBeenLastCalledWith("$$\nx^2 + y^2 = z^2\n$$");
+  });
 });

@@ -151,6 +151,10 @@ export function ImmersiveEditor(props: ImmersiveEditorProps) {
 
     const plugins = () => [
       history(),
+      new Plugin({ appendTransaction: (_transactions, _previous, state) => {
+        if (state.doc.lastChild?.type === schema.nodes.paragraph) return null;
+        return state.tr.insert(state.doc.content.size, schema.nodes.paragraph.create({ ephemeral: true }));
+      } }),
       inputRules({ rules: [
         textblockTypeInputRule(/^(#{1,6})\s$/, schema.nodes.heading, (match) => ({ level: match[1].length })),
         wrappingInputRule(/^\s*([-+*])\s$/, schema.nodes.bullet_list),
