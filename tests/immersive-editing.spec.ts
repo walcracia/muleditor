@@ -32,7 +32,9 @@ test("typing and selected-text toolbar formatting update Markdown and save dirty
   const editor = immersiveEditor(page);
   await expect(editor).toBeVisible();
   const paragraph = editor.locator("p").filter({ hasText: "需要加粗的短语" }).first();
-  await paragraph.click({ clickCount: 3 });
+  await paragraph.click();
+  await page.keyboard.press("Home");
+  await page.keyboard.press("Shift+End");
   await expect.poll(() => page.evaluate(() => getSelection()?.toString())).toBe("需要加粗的短语");
   await page.locator(".formatNavLine").getByRole("button", { name: "加粗", exact: true }).click();
   await expect(editor.locator("strong")).toHaveText("需要加粗的短语");
@@ -216,6 +218,13 @@ test("toolbar undo and redo restore document content and dirty state", async ({ 
   await expect(editor).not.toContainText("撤销重做标记。");
   await expect(page.locator(".statusBar")).toContainText("已保存");
   expect((await downloadDocument(page)).toString("utf8")).toBe(original);
+  await page.locator("#fileInput").setInputFiles({
+    name: "history-inspection.json", mimeType: "application/json", buffer: Buffer.from('{"keep":"separate document"}\n')
+  });
+  expect((await downloadDocument(page)).toString("utf8")).toBe('{"keep":"separate document"}\n');
+  await page.locator(".tabs .tab").filter({ hasText: "history.md" }).click();
+  await expect(editor).toContainText("初始正文。");
+  await expect(editor).not.toContainText("撤销重做标记。");
   await expect(redo).toBeEnabled();
   await redo.click();
   await expect(editor).toContainText("撤销重做标记。");
