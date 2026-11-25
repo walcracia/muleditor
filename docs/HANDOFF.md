@@ -1,6 +1,6 @@
 # MulEditor 跨电脑 AI 交接
 
-更新时间：2026-11-20（Asia/Shanghai）。本文件保存当前状态；长期设计和历史验证保存在 [design_progress.md](design_progress.md)。
+更新时间：2026-11-25（Asia/Shanghai）。本文件保存当前状态；长期设计和历史验证保存在 [design_progress.md](design_progress.md)。
 
 ## 接班入口与三项原则
 
@@ -12,7 +12,19 @@
 
 每次结束都检查这三项，并更新本文当前状态与设计文档中的相应记录。
 
-## 当前交接：Markdown 统一渲染与导出
+## 当前交接：2026-11-25-01 沉浸模式与源代码模式
+
+- 授权范围：Markdown 的编辑/预览改为均可直接编辑的沉浸模式与源代码模式；HTML 保持源码及预览，XML/YAML/JSON/SPDX 保持源码及结构视图。保留 React、Monaco、多格式架构及统一 Markdown 导出管线。
+- 基准：`b3a7d776729b5ad95c9baf6c7468520aaf0479f4`；集成分支 `agent/immersive-20261125`，模型、组件、浏览器回归在三个独立 worktree 开发，目标版本 `0.3.0`。
+- 已实现：ProseMirror 可视编辑、源块保真、语义工具栏、模式同步和特殊节点编辑；Markdown 默认沉浸，两种模式都可编辑。普通标题/列表/引用/任务/表格直接操作；公式/图表/图片有表单；脚注编辑对应定义。仅切换不改源文、不置 dirty。
+- 验收重点：无编辑切换不改字节、不置 dirty；局部修改不丢 Front Matter、脚注、图表及原始 HTML；源码与沉浸内容同步；另存和离线 HTML 导出保留公式、图表、图片与样式。
+- 当前验证：Windows x64、Node 22.14.0/npm 10.9.2、Rust 1.99.1；`npm ci`、版本校验、`npm run check`、`npm run build`、97 个前端测试通过。Edge 的最终 `npm run test:e2e` 13 组全部通过，覆盖实际下载 HTML 离线公式/字体/图表/图片及净化、模式同步、真实选区、工具栏、列表、任务、表格、撤销/重做和迟到 Monaco 加载；额外快速 Home/Shift+End 连续 8 次通过。`cargo check --locked` 通过；Rust test 首次内存分配失败，串行 `cargo test --locked -j 1` 后 9 项通过。Cargo manifest 均为 `src-tauri/Cargo.toml`。
+- 视觉证据：本轮实际生产构建的[中文 1600px](assets/muleditor-0.3.0-immersive-zh.png)、[英文 1040px](assets/muleditor-0.3.0-immersive-en-minimum.png)；两种语言 1040/1600 均检查，窄窗口工具栏横向滚动，模式和右侧大纲不裁切。原生/发布证据将在完成后回填。
+- 下一步：桌面构建，然后推送并发布可下载的新版本。当前稳定下载仍为下方 `v0.2.0`，`0.3.0` 尚未发布。
+- 保真边界：只规范化真实修改的顶层块；复杂 HTML/未知语法保留原文节点；源码变更/格式化会重建相应沉浸撤销历史。GFM 表格不提供合并单元格或持久列宽。跨标签切换保留内容与已有模式；跨非 Markdown 标签保留沉浸历史。
+- 模块入口：`src/components/ImmersiveEditor.tsx`、`src/lib/immersiveMarkdown.ts`、`src/immersive.css`；模式/文档生命周期仍在 `src/App.tsx`，Monaco 在 `EditorPane.tsx`；预览/特殊节点及 HTML 导出仍共用 `src/lib/markdown.ts`。
+
+## 历史交接：2026-11-20 Markdown 统一渲染与导出
 
 - 用户范围：保留 React、Monaco、多格式架构，补公式、预览代码高亮、脚注、标题锚点、本地图片、HTML 净化，并统一预览和导出以保留图表/样式。
 - 当前分支 `main`；功能分支已整合并推送。三个子任务在独立 worktree/分支实施，合并前不共享未提交源码。
@@ -57,7 +69,7 @@
 
 ## 源码当前状态
 
-- 技术：Tauri 2 + React 18 + TypeScript + Vite + Monaco `0.56.0`；Markdown 使用 markdown-it + KaTeX + highlight.js + DOMPurify，保留 npm/Cargo 锁文件。
+- 技术：Tauri 2 + React 18 + TypeScript + Vite + Monaco `0.56.0`；Markdown 使用 ProseMirror 沉浸模型及 markdown-it + KaTeX + highlight.js + DOMPurify 共享渲染，保留 npm/Cargo 锁文件。
 - 新启动只有空 `untitled.md`；首次打开/新建实际文档会替换未编辑的占位标签。
 - 支持 Markdown/Mermaid 预览、HTML 预览、JSON/YAML/XML/SPDX 基础分析、各格式导航与片段、跨文件引用索引、中英文界面。
 - 支持打开文件/目录、保存、导出、桌面启动文件参数和拖放；浏览器模式以文件选择及下载实现可用回退。
@@ -68,6 +80,7 @@
 | --- | --- |
 | 状态、文档标签与动作 | `src/App.tsx`、`src/types.ts` |
 | 编辑/比较与模型生命周期 | `src/components/EditorPane.tsx` |
+| Markdown 沉浸编辑与源块保真 | `src/components/ImmersiveEditor.tsx`、`src/lib/immersiveMarkdown.ts`、`src/immersive.css` |
 | 各格式扩展 | `src/lib/formatAdapters.ts`、`formatAnalyzers.ts`、`workspaceExtractors.ts` |
 | 工作区引用索引 | `src/lib/workspace.ts` |
 | Markdown 与 Mermaid | `src/lib/markdown.ts`、`mermaid.ts`、`src/components/DocumentPreview.tsx` |

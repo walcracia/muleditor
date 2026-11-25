@@ -12,24 +12,70 @@ interface EditorPaneProps {
   showDiff: boolean;
   diffSourceId?: string;
   locale: Locale;
+  active?: boolean;
   command?: EditorCommand;
   onChange: (content: string) => void;
   onDiffSourceChange: (tabId?: string) => void;
 }
 
-export function EditorPane({ tab, tabs, showDiff, diffSourceId, locale, command, onChange, onDiffSourceChange }: EditorPaneProps) {
+export function EditorPane({ tab, tabs, showDiff, diffSourceId, locale, active = true, command, onChange, onDiffSourceChange }: EditorPaneProps) {
   const editorRef = useRef<MonacoEditor.IStandaloneCodeEditor | null>(null);
   const diffModelsRef = useRef<MonacoEditor.IDiffEditorModel | null>(null);
   const appliedCommandRef = useRef<number>();
+  const latestPropsRef = useRef({ active, tabId: tab.id, command, showDiff });
+  latestPropsRef.current = { active, tabId: tab.id, command, showDiff };
 
   function applyCommand(editor: MonacoEditor.IStandaloneCodeEditor, nextCommand: EditorCommand) {
     if (appliedCommandRef.current === nextCommand.id) return;
+    if (editor.getModel()?.uri.toString() !== `muleditor://document/${nextCommand.tabId}`) return;
     appliedCommandRef.current = nextCommand.id;
 
     if (nextCommand.kind === "goTo") {
       const lineNumber = Math.max(1, nextCommand.line);
       editor.revealLineInCenter(lineNumber);
       editor.setPosition({ lineNumber, column: nextCommand.column ?? 1 });
+      editor.focus();
+      return;
+    }
+
+    if (nextCommand.kind === "format") {
+      if (nextCommand.action === "md-undo" || nextCommand.action === "md-redo") {
+        editor.trigger("format-navigation", nextCommand.action === "md-undo" ? "undo" : "redo", null);
+        editor.focus();
+        return;
+      }
+      const model = editor.getModel();
+      const selection = editor.getSelection();
+      if (!model || !selection) return;
+      const selected = model.getValueInRange(selection);
+      const wrappers: Record<string, [string, string, string]> = {
+        "md-bold": ["**", "**", "bold"],
+        "md-italic": ["_", "_", "italic"],
+        "md-strike": ["~~", "~~", "strikethrough"],
+        "md-inline-code": ["`", "`", "code"],
+        "md-link": ["[", "](./document.md#section)", "label"],
+        "md-upload": ["![", "](./image.png)", "alt"]
+      };
+      const wrapper = wrappers[nextCommand.action];
+      let range: MonacoEditor.IIdentifiedSingleEditOperation["range"] = selection;
+      let replacement = nextCommand.text ?? "";
+      if (wrapper) {
+        replacement = `${wrapper[0]}${selected || wrapper[2]}${wrapper[1]}`;
+      } else {
+        const prefixes: Record<string, string> = {
+          "md-heading": "# ", "md-list": "- ", "md-ordered": "1. ", "md-task": "- [ ] ", "md-quote": "> "
+        };
+        const prefix = prefixes[nextCommand.action];
+        if (prefix) {
+          range = { startLineNumber: selection.startLineNumber, startColumn: 1,
+            endLineNumber: selection.endLineNumber, endColumn: model.getLineMaxColumn(selection.endLineNumber) };
+          replacement = model.getValueInRange(range).split(/\r?\n/).map((line) => `${prefix}${line}`).join(model.getEOL());
+        }
+      }
+      if (!replacement) return;
+      editor.pushUndoStop();
+      editor.executeEdits("format-navigation", [{ range, text: replacement, forceMoveMarkers: true }]);
+      editor.pushUndoStop();
       editor.focus();
       return;
     }
@@ -51,12 +97,13 @@ export function EditorPane({ tab, tabs, showDiff, diffSourceId, locale, command,
   }
 
   useEffect(() => {
-    if (!command || command.tabId !== tab.id || !editorRef.current || showDiff) return;
+    if (!active || !command || command.tabId !== tab.id || !editorRef.current || showDiff) return;
     applyCommand(editorRef.current, command);
-  }, [command, showDiff, tab.id]);
+  }, [active, command, showDiff, tab.id]);
 
   useEffect(() => {
     if (!showDiff) return;
+    editorRef.current = null;
 
     return () => {
       const models = diffModelsRef.current;
@@ -139,12 +186,15 @@ export function EditorPane({ tab, tabs, showDiff, diffSourceId, locale, command,
   return (
     <Editor
       className="monacoHost"
+      path={`muleditor://document/${tab.id}`}
       language={getMonacoLanguage(tab.format)}
       value={tab.content}
       theme="vs"
       onMount={(editor) => {
         editorRef.current = editor;
-        if (command && command.tabId === tab.id) applyCommand(editor, command);
+        // Monaco may finish loading after the user changed tabs or returned to immersive mode.
+        const latest = latestPropsRef.current;
+        if (latest.active && !latest.showDiff && latest.command?.tabId === latest.tabId) applyCommand(editor, latest.command);
       }}
       onChange={(value) => onChange(value ?? "")}
       options={{

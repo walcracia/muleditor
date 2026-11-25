@@ -3,6 +3,7 @@ import type { KeyboardEvent } from "react";
 import {
   CheckCircle2,
   ChevronDown,
+  Code2,
   Download,
   Eye,
   FileDown,
@@ -28,6 +29,8 @@ interface ToolbarProps {
   showDiff: boolean;
   showInspector: boolean;
   status: string;
+  markdownMode: "immersive" | "source";
+  onMarkdownModeChange: (mode: "immersive" | "source") => void;
   onNew: (format: DocumentFormat) => void;
   onOpen: () => void;
   onOpenFolder: () => void;
@@ -178,6 +181,23 @@ export function Toolbar(props: ToolbarProps) {
         ) : null}
       </div>
       <div className="toolbarGroup">
+        {props.activeFormat === "markdown" ? (
+          <>
+            <button type="button" className={props.markdownMode === "immersive" && !props.showDiff ? "isActive" : ""}
+              aria-pressed={props.markdownMode === "immersive" && !props.showDiff}
+              onClick={() => props.onMarkdownModeChange("immersive")} title={text(props.locale, "toolbar.immersive")}>
+              <PencilLine size={16} />
+              {text(props.locale, "toolbar.immersive")}
+            </button>
+            <button type="button" className={props.markdownMode === "source" && !props.showDiff ? "isActive" : ""}
+              aria-pressed={props.markdownMode === "source" && !props.showDiff}
+              onClick={() => props.onMarkdownModeChange("source")} title={text(props.locale, "toolbar.source")}>
+              <Code2 size={16} />
+              {text(props.locale, "toolbar.source")}
+            </button>
+          </>
+        ) : (
+          <>
         <button type="button" className={props.showEditor ? "isActive" : ""} onClick={props.onToggleEditor} title={text(props.locale, "toolbar.editorTitle")}>
           <PencilLine size={16} />
           {text(props.locale, "toolbar.editor")}
@@ -186,6 +206,8 @@ export function Toolbar(props: ToolbarProps) {
           <Eye size={16} />
           {text(props.locale, "toolbar.preview")}
         </button>
+          </>
+        )}
         <button type="button" onClick={props.onFormat} title={text(props.locale, "toolbar.format")}>
           <Wand2 size={16} />
           {text(props.locale, "toolbar.format")}

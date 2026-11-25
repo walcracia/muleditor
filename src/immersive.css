@@ -30,7 +30,7 @@
 .immersiveDocument .ProseMirror-hideselection ::selection { background: transparent; }
 .immersiveDocument .ProseMirror-hideselection { caret-color: transparent; }
 .immersiveDocument .ProseMirror-trailingBreak { pointer-events: none; }
-.immersiveDocument table { table-layout: fixed; width: 100%; display: table; overflow: visible; }
+.markdownBody.immersiveDocument table { table-layout: fixed; width: 100%; display: table; overflow: visible; }
 .immersiveDocument .tableWrapper { max-width: 100%; overflow-x: auto; margin-block: 1em; }
 .immersiveDocument td,
 .immersiveDocument th { min-width: 75px; position: relative; vertical-align: top; }
@@ -70,7 +70,6 @@ span.immersiveNodeView { display: inline; vertical-align: baseline; }
 .immersiveNodeEdit:focus-visible,
 .immersiveInsertForm :is(input, textarea, button):focus-visible,
 .immersiveTableTools button:focus-visible { outline: 2px solid #2563b0; outline-offset: 2px; }
-.immersiveNodeView:not(:hover):not(.ProseMirror-selectednode) .immersiveNodeEdit:not(:focus-visible) { opacity: 0.3; }
 .immersiveInsertForm {
   position: sticky;
   inset-block-start: 0;

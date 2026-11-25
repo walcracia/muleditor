@@ -1,6 +1,6 @@
 # 哞-编辑器 Design And Progress
 
-Last updated: 2026-11-20 Asia/Shanghai
+Last updated: 2026-11-25 Asia/Shanghai
 
 ## AI 迭代、多电脑交接与下载发布（长期设计约束）
 
@@ -261,6 +261,26 @@ Known implementation boundary:
 - Full Tauri desktop build now works on this machine after installing Rustup and using a local mirror for Tauri bundler tools.
 
 ## Progress Log
+
+### 2026-11-25-01 Markdown 沉浸模式与源代码模式
+
+用户已确认本轮范围：Markdown 用可直接编辑的沉浸模式与 Monaco 源代码模式替代“编辑/预览”两块只读/可写分工。HTML 继续源码编辑及渲染预览；XML、YAML、JSON、SPDX 继续源码编辑及结构化查看，不把结构视图称为所见即所得编辑。
+
+设计与验收约束：
+
+- 保留 React、Monaco、多格式工作台；Markdown 默认沉浸，两个模式互斥显示，按文档保存模式选择。两种视图共同更新 `DocumentTab.content`，dirty、保存、另存为及导出仍由 App 管理。
+- 沉浸编辑使用 ProseMirror 的文档、选区、事务、输入规则和撤销历史。普通文字、标题、引用、列表、任务项、表格直接编辑；工具栏针对当前选区或节点执行操作。输入标题/列表等上下文会转换结构，Enter 延续/退出列表。
+- `immersiveMarkdown.ts` 从现有 Markdown 解析配置建立可编辑模型，保存原始块及分隔内容。打开与仅切换模式不序列化；真实修改时只规范化改动的块。Front Matter、引用定义、原始 HTML 和未支持的扩展保留原文，不静默丢弃。
+- 公式、Mermaid、图片等特殊节点复用 `markdown.ts` 的渲染和净化流程，并提供节点内容/属性编辑入口。HTML 导出继续从权威 Markdown 源文调用完整共享管线，不从编辑 DOM 拼接，保证离线图片、字体、图表与样式。
+- 只读比较保持只读。源码模式继续提供 Monaco 语法编辑、原有格式化、诊断和导航；其他格式的显示开关不变。中文/英文文案同步。
+
+实现入口：`ImmersiveEditor.tsx` 管理 ProseMirror 生命周期、按标签缓存、语义命令、特殊节点、共享脚注渲染和节点表单；`immersiveMarkdown.ts` 复用 `tokenizeMarkdown` 建模，按顶层源块保存原文；`App.tsx` 管理模式与绑定文档的回调。源码编辑延迟挂载，加载完成时核对最新标签和可见模式，避免抢焦点或消费错误命令。比较仍只读。
+
+本轮解决的交互边界包括：源内容回传不重建模型、跨非 Markdown 标签保留撤销、插入原子块后仍可继续输入、已有脚注编辑其真实定义、多处定义不重复显示脚注、另存目录后重新解析图片，以及 Home/Shift+End 在聚焦后的快速选区。公式、图表和图片均通过共享管线渲染；源码模式隐藏沉浸区时仍可完整导出。
+
+保真范围：未改动的顶层块逐字保留，编辑列表/表格内的内容会规范化该整个顶层块；复杂 HTML/未知扩展保留为原文节点并提供局部编辑。源码修改或格式化后重新导入相应 Markdown 模型，会重建该文档的沉浸撤销历史。GFM 表格提供单元格、行列操作，不提供不能保存到 Markdown 的合并单元格/持久列宽。Monaco CDN、未签名 Windows 包、无会话持久化等既有限制仍适用。
+
+版本 `0.3.0`。本轮已执行 `npm ci`、版本校验、类型检查、前端构建和 97 个前端测试；最终 Edge 浏览器回归 13 组全部通过，真实下载的 HTML 离线保留公式/字体/图表/图片与样式，净化、选区工具栏、上下文结构和源码同步均检查。快速 Home/Shift+End 连续 8 次通过；中英文 1040/1600 实际截图核查通过，证据见 `HANDOFF.md`。Rust check 通过；test 首次在本机内存紧张时分配失败，改用 `-j 1` 后 9 项全部通过，未改动 Rust 业务代码。构建仍有既有大 chunk 提示。桌面/发布状态以交接中的本轮记录为准。
 
 ### 2026-11-20 Markdown 统一渲染与自包含导出
 

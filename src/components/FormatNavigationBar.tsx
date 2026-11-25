@@ -8,6 +8,7 @@ import {
   FileCode2,
   FileJson,
   FileSymlink,
+  FunctionSquare,
   GitBranch,
   Hash,
   Heading1,
@@ -38,6 +39,7 @@ import {
 import type { DocumentFormat, DocumentTab, FormatNavigationInfo, WorkspaceReference } from "../types";
 import type { Locale } from "../lib/i18n";
 import { formatLabel, text } from "../lib/i18n";
+import type { ImmersiveToolbarState } from "./ImmersiveEditor";
 
 interface FormatNavigationBarProps {
   tab: DocumentTab;
@@ -46,6 +48,9 @@ interface FormatNavigationBarProps {
   onGoToLine: (tabId: string, line: number) => void;
   onOpenReference: (reference: WorkspaceReference) => void;
   onInsertSnippet: (text: string) => void;
+  onMarkdownAction: (action: string, snippet?: string) => void;
+  immersiveState?: ImmersiveToolbarState;
+  readOnly?: boolean;
   onReferenceHealth: (unresolvedCount: number) => void;
 }
 
@@ -71,9 +76,19 @@ export function FormatNavigationBar({
   onGoToLine,
   onOpenReference,
   onInsertSnippet,
+  onMarkdownAction,
+  immersiveState,
+  readOnly = false,
   onReferenceHealth
 }: FormatNavigationBarProps) {
-  const actionGroups = toolActionGroupsForFormat(tab.format, locale);
+  const actionGroups = toolActionGroupsForFormat(tab.format, locale).map((group) => ({
+    ...group,
+    actions: group.actions.map((action) => ({
+      ...action,
+      disabled: readOnly || (action.id === "md-undo" ? !immersiveState?.canUndo && !!immersiveState
+        : action.id === "md-redo" ? !immersiveState?.canRedo && !!immersiveState : action.disabled)
+    }))
+  }));
   const declarations = info.declarations.filter((item) => item.line).slice(0, 2);
   const references = info.references.slice(0, 3);
   const unresolvedCount = info.references.filter((reference) => reference.status === "unresolved").length;
@@ -86,12 +101,15 @@ export function FormatNavigationBar({
             {group.actions.map((action) => (
               <button
                 type="button"
-                className={actionClassName(action)}
+                className={`${actionClassName(action)}${immersiveState?.activeActions.includes(action.id) ? " active" : ""}`}
                 key={action.id}
                 aria-label={action.title}
                 title={action.title}
                 disabled={action.disabled}
-                onClick={action.text ? () => onInsertSnippet(action.text ?? "") : undefined}
+                aria-pressed={immersiveState && ["md-heading", "md-bold", "md-italic", "md-strike", "md-list", "md-ordered", "md-task", "md-quote", "md-inline-code"].includes(action.id)
+                  ? immersiveState.activeActions.includes(action.id) : undefined}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => tab.format === "markdown" ? onMarkdownAction(action.id, action.text) : action.text && onInsertSnippet(action.text)}
               >
                 {action.icon}
                 {action.label ? <span>{action.label}</span> : null}
@@ -195,16 +213,19 @@ function toolActionGroupsForFormat(format: DocumentFormat, locale: Locale): Form
           tool("md-quote", "", local(locale, "插入引用", "Insert quote"), "\n> quote", <TextQuote size={17} />),
           tool("md-hr", "", local(locale, "插入分隔线", "Insert horizontal rule"), "\n---\n", <Minus size={17} />),
           tool("md-code", "", local(locale, "插入代码块", "Insert code block"), "\n```txt\n\n```", <SquareCode size={17} />),
-          tool("md-inline-code", "", local(locale, "插入行内代码", "Insert inline code"), "`code`", <Code size={17} />)
+          tool("md-inline-code", "", local(locale, "插入行内代码", "Insert inline code"), "`code`", <Code size={17} />),
+          tool("md-math", "", local(locale, "插入公式", "Insert equation"), "\n$$\nx^2\n$$\n", <FunctionSquare size={17} />),
+          tool("md-mermaid", "", local(locale, "插入图表", "Insert diagram"), "\n```mermaid\nflowchart LR\n  A --> B\n```\n", <GitBranch size={17} />),
+          tool("md-footnote", "", local(locale, "插入脚注", "Insert footnote"), "[^note]\n\n[^note]: note\n", <Anchor size={17} />)
         ]),
         group("md-media", [
-          tool("md-upload", "", local(locale, "插入上传资源占位", "Insert uploaded asset placeholder"), "![alt](./image.png)", <UploadCloud size={17} />),
+          tool("md-upload", "", local(locale, "插入图片", "Insert image"), "![alt](./image.png)", <UploadCloud size={17} />),
           tool("md-audio", "", local(locale, "插入音频链接", "Insert audio link"), "[audio](./audio.mp3)", <Mic size={17} />),
           tool("md-table", "", local(locale, "插入表格", "Insert table"), "\n| Name | Value |\n| --- | --- |\n| item | value |\n", <Table size={17} />)
         ]),
         group("md-history", [
-          tool("md-undo", "", local(locale, "撤销由编辑器处理", "Undo is handled by the editor"), undefined, <Undo2 size={17} />, false, true),
-          tool("md-redo", "", local(locale, "重做由编辑器处理", "Redo is handled by the editor"), undefined, <Redo2 size={17} />, false, true),
+          tool("md-undo", "", local(locale, "撤销", "Undo"), undefined, <Undo2 size={17} />),
+          tool("md-redo", "", local(locale, "重做", "Redo"), undefined, <Redo2 size={17} />),
           tool("md-expand", "", local(locale, "扩展视图", "Expand view"), undefined, <Maximize2 size={17} />, false, true)
         ])
       ];

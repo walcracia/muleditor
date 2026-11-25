@@ -130,4 +130,11 @@ export type EditorCommand =
       tabId: string;
       kind: "insert";
       text: string;
+    }
+  | {
+      id: number;
+      tabId: string;
+      kind: "format";
+      action: string;
+      text?: string;
     };

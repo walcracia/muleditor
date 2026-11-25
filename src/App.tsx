@@ -5,6 +5,8 @@ import { EditorTabs } from "./components/EditorTabs";
 import { FileSidebar } from "./components/FileSidebar";
 import { FormatNavigationBar } from "./components/FormatNavigationBar";
 import { InspectorPane } from "./components/InspectorPane";
+import { ImmersiveEditor } from "./components/ImmersiveEditor";
+import type { ImmersiveToolbarState } from "./components/ImmersiveEditor";
 import { ProblemsPanel } from "./components/ProblemsPanel";
 import { StatusBar } from "./components/StatusBar";
 import { Toolbar } from "./components/Toolbar";
@@ -62,6 +64,12 @@ export function App() {
   const [status, setStatus] = useState(() => text(initialLocale(), "status.ready"));
   const [editorCommand, setEditorCommand] = useState<EditorCommand>();
   const [previewNavigation, setPreviewNavigation] = useState<OutlineNavigationCommand>();
+  const [markdownModes, setMarkdownModes] = useState<Record<string, "immersive" | "source">>({});
+  const [immersiveCommand, setImmersiveCommand] = useState<{ id: number; tabId: string; action: string }>();
+  const [immersiveState, setImmersiveState] = useState<ImmersiveToolbarState>({ activeActions: [], canUndo: false, canRedo: false });
+  const [sourceLoaded, setSourceLoaded] = useState(false);
+  const commandSerial = useRef(0);
+  const lastMarkdownId = useRef(initialTab.id);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
   const startupFilesLoadedRef = useRef(false);
@@ -84,8 +92,18 @@ export function App() {
   );
   const activeAnalysis = analyses.find((entry) => entry.tab.id === activeTab.id)?.analysis ?? analyzeDocument(activeTab.format, activeTab.content);
   const activeFormatNav = workspaceIndex.byTabId[activeTab.id] ?? emptyFormatNavigation(activeTab.format);
-  const showDocumentPreview = showPreview && !showDiff;
-  const editorSplitClass = showEditor && showDocumentPreview ? "editorSplit withPreview" : !showEditor && showDocumentPreview ? "editorSplit previewOnly" : "editorSplit";
+  const isMarkdown = activeTab.format === "markdown";
+  if (isMarkdown) lastMarkdownId.current = activeTab.id;
+  const immersiveTab = isMarkdown ? activeTab : tabs.find((tab) => tab.id === lastMarkdownId.current && tab.format === "markdown");
+  const markdownMode = markdownModes[activeTab.id] ?? "immersive";
+  const showImmersive = isMarkdown && markdownMode === "immersive" && !showDiff;
+  const showSourcePane = isMarkdown ? markdownMode === "source" || showDiff : showEditor;
+  const showDocumentPreview = !isMarkdown && showPreview && !showDiff;
+  const editorSplitClass = showSourcePane && showDocumentPreview ? "editorSplit withPreview" : !showSourcePane && showDocumentPreview ? "editorSplit previewOnly" : "editorSplit";
+
+  useEffect(() => {
+    if (showSourcePane) setSourceLoaded(true);
+  }, [showSourcePane]);
 
   useEffect(() => {
     folderInputRef.current?.setAttribute("webkitdirectory", "");
@@ -333,9 +351,14 @@ export function App() {
   }
 
   function updateActiveContent(content: string) {
-    setTabs((current) =>
-      current.map((tab) =>
-        tab.id === activeTab.id
+    updateTabContent(activeTab.id, content);
+  }
+
+  function updateTabContent(tabId: string, content: string) {
+    setTabs((current) => {
+      if (!current.some((tab) => tab.id === tabId && tab.content !== content)) return current;
+      return current.map((tab) =>
+        tab.id === tabId
           ? {
               ...tab,
               content,
@@ -343,8 +366,8 @@ export function App() {
               format: detectFormat(tab.name, content)
             }
           : tab
-      )
-    );
+      );
+    });
   }
 
   async function handleSave() {
@@ -447,23 +470,24 @@ export function App() {
     setActiveId(tabId);
     setShowEditor(true);
     setShowDiff(false);
+    setMarkdownModes((current) => ({ ...current, [tabId]: "source" }));
     setEditorCommand({ id: Date.now(), tabId, kind: "goTo", line });
   }
 
   function handleSelectOutlineItem(item: OutlineItem) {
     const commandId = Date.now();
 
-    if (item.line && (showEditor || showDiff)) {
+    if (item.line && !showImmersive && (showSourcePane || showDiff)) {
       setShowDiff(false);
       setEditorCommand({ id: commandId, tabId: activeTab.id, kind: "goTo", line: item.line });
     }
 
-    if (showPreview) {
+    if (showPreview || showImmersive) {
       setPreviewNavigation({ id: commandId, tabId: activeTab.id, outlineId: item.id });
     }
   }
 
-  function handleOpenReference(reference: WorkspaceReference) {
+  function handleOpenReference(reference: WorkspaceReference, preferredMode: "immersive" | "source" = "source") {
     if (!reference.resolvedTabId) {
       setStatus(text(locale, "status.unresolvedReference", { target: reference.rawTarget }));
       return;
@@ -472,6 +496,13 @@ export function App() {
     setActiveId(reference.resolvedTabId);
     setShowEditor(true);
     setShowDiff(false);
+    const targetId = reference.resolvedTabId;
+    setMarkdownModes((current) => ({ ...current, [targetId]: preferredMode }));
+    if (preferredMode === "immersive") {
+      const targetOutline = analyses.find(({ tab }) => tab.id === targetId)?.analysis.outline;
+      const item = targetOutline?.find((entry) => entry.line === reference.resolvedLine) ?? targetOutline?.[0];
+      if (item) setPreviewNavigation({ id: ++commandSerial.current, tabId: targetId, outlineId: item.id });
+    }
     setEditorCommand({
       id: Date.now(),
       tabId: reference.resolvedTabId,
@@ -486,7 +517,7 @@ export function App() {
       try { return decodeURI(value); } catch { return value; }
     };
     const reference = activeFormatNav.references.find((item) => normalize(item.rawTarget) === normalize(href));
-    if (reference) handleOpenReference(reference);
+    if (reference) handleOpenReference(reference, "immersive");
     else setStatus(text(locale, "status.unresolvedReference", { target: href }));
   }
 
@@ -495,6 +526,21 @@ export function App() {
     setShowDiff(false);
     setEditorCommand({ id: Date.now(), tabId: activeTab.id, kind: "insert", text: snippetText });
     setStatus(text(locale, "status.insertedSnippet", { format: formatLabel(activeTab.format, locale) }));
+  }
+
+  function handleMarkdownModeChange(mode: "immersive" | "source") {
+    setMarkdownModes((current) => ({ ...current, [activeTab.id]: mode }));
+    setShowDiff(false);
+  }
+
+  function handleMarkdownAction(action: string, snippet?: string) {
+    if (showDiff) return;
+    const id = ++commandSerial.current;
+    if (showImmersive) {
+      setImmersiveCommand({ id, tabId: activeTab.id, action });
+    } else {
+      setEditorCommand({ id, tabId: activeTab.id, kind: "format", action, text: snippet });
+    }
   }
 
   function handleReferenceHealth(unresolvedCount: number) {
@@ -591,6 +637,8 @@ export function App() {
         showDiff={showDiff}
         showInspector={showInspector}
         status={status}
+        markdownMode={markdownMode}
+        onMarkdownModeChange={handleMarkdownModeChange}
         onNew={handleNew}
         onOpen={handleOpen}
         onOpenFolder={handleOpenFolder}
@@ -617,20 +665,41 @@ export function App() {
             onGoToLine={handleGoToLine}
             onOpenReference={handleOpenReference}
             onInsertSnippet={handleInsertSnippet}
+            onMarkdownAction={handleMarkdownAction}
+            immersiveState={showImmersive ? immersiveState : undefined}
+            readOnly={showDiff}
             onReferenceHealth={handleReferenceHealth}
           />
           <div className={editorSplitClass}>
-            {showEditor ? (
-              <EditorPane
-                tab={activeTab}
-                tabs={tabs}
-                showDiff={showDiff}
-                diffSourceId={diffSourceId}
-                locale={locale}
-                command={editorCommand}
-                onChange={updateActiveContent}
-                onDiffSourceChange={setDiffSourceId}
-              />
+            {immersiveTab ? (
+              <div className="editorSurface" hidden={!showImmersive}>
+                <ImmersiveEditor
+                  tab={immersiveTab}
+                  locale={locale}
+                  active={showImmersive}
+                  resourceVersion={markdownResourceVersion}
+                  command={immersiveCommand?.tabId === immersiveTab.id ? immersiveCommand : undefined}
+                  navigation={previewNavigation}
+                  onChange={(content) => updateTabContent(immersiveTab.id, content)}
+                  onOpenLocalLink={handleOpenPreviewLink}
+                  onStateChange={setImmersiveState}
+                />
+              </div>
+            ) : null}
+            {sourceLoaded || showSourcePane ? (
+              <div className="editorSurface" hidden={!showSourcePane}>
+                <EditorPane
+                  tab={activeTab}
+                  tabs={tabs}
+                  active={showSourcePane}
+                  showDiff={showDiff}
+                  diffSourceId={diffSourceId}
+                  locale={locale}
+                  command={editorCommand}
+                  onChange={updateActiveContent}
+                  onDiffSourceChange={setDiffSourceId}
+                />
+              </div>
             ) : null}
             {showDocumentPreview ? (
               <DocumentPreview

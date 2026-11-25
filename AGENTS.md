@@ -16,6 +16,7 @@
 - UI 文本同步中文/英文；保持文件内容、dirty 状态、保存行为、预览与只读比较的正确性。
 - Monaco 当前固定 `0.56.0`；升级时同步 npm 依赖、锁文件和 `src/main.tsx` 中 CDN 版本，核查 Diff 组件生命周期。
 - Markdown 预览与 HTML 导出必须共用 `src/lib/markdown.ts` 的完整渲染管线；标题锚点、大纲与引用复用标题解析。改动公式/图表/图片时同时验证导出后的独立 HTML，不能只验证预览。样式源为 `src/markdown.css`。
+- Markdown 沉浸编辑在 `ImmersiveEditor.tsx`，源块保真在 `immersiveMarkdown.ts`，共同更新 `DocumentTab.content`。仅打开、切换视图或渲染完成不能重写源文或置 dirty；未知语法保留原文。改动编辑模型时同时验证无编辑字节保真、局部修改、源码同步、选区/撤销及特殊节点导出，不能从编辑 DOM 反推最终导出。
 - 依赖变动提交 `package-lock.json` 和相应 `Cargo.lock`；不要只改版本声明。正式发布的 npm、Cargo 和 Tauri 项目版本一致。
 - 不提交 `node_modules/`、`dist/`、`src-tauri/target/`、生成的 schema、`release/`、本机 `.codex/` 状态、凭据、`.env` 或私钥。必要的脱敏验证截图放 `docs/assets/`，不要依赖未跟踪的临时输出。
 - 不覆盖其他 agent 的未提交工作；并行 agent 使用独立分支/工作树，明确负责文件。合并远端变更时保留双方内容并重新验证，不使用强推、`reset --hard` 或清理命令掩盖冲突。
