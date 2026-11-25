@@ -15,11 +15,15 @@
 ## 当前交接：2026-11-25 状态栏简化与当前格式高亮
 
 - 用户要求：移除 Tauri 等运行环境信息；底部文件类型列表高亮当前打开文档的格式，随活动文件同步变化。
-- 基准 `f2e3f74`，分支 `agent/status-format-20261125`；目标版本 0.3.2，尚未发布，稳定下载仍为 0.3.1。
+- 基准 `f2e3f74`，分支 `agent/status-format-20261125` 已合入并推送 `main`；发行标签 `v0.3.2` 的源提交固定为 `015576a15ee2ebfdf56b3f09e4671681fb3bf70c`。本确认仅更新文档，精确提交可运行 `git log -1`，不移动标签或替换附件。
 - 实现入口：`StatusBar.tsx`、`src/styles.css`，格式直接派生 `DocumentTab.format`，SPDX 三种变体归为一组；移除 App 传入的 runtime 与对应 UI 文案。开发文档中的技术栈说明保留。
 - 已验证：`npm run check`、`npm run build`、97 项前端测试、版本校验，以及本轮原有 15 组和新增 2 组 Edge 浏览器回归均通过；Rust check/test（`--locked -j 1`，manifest 为 `src-tauri/Cargo.toml`）9 项通过。依赖仅项目版本变化，沿用本会话已完成的 `npm ci`；云端还会重新锁定安装。
 - 实测多文件切换仅对应项高亮，SPDX 三种变体一致，状态标签不修改文件或 dirty；中英文 1600/1040 均完整显示，运行环境标识消失。截图：[MD 高亮](assets/muleditor-0.3.2-format-zh.png)、[JSON 高亮/英文最小窗口](assets/muleditor-0.3.2-format-en-minimum.png)。未知格式不误亮；未为测试引入生产后门。
-- 下一步：提交推送、完成 Windows 构建及下载包，核对 CI/Release 与下载哈希后回填发布证据。当前 0.3.2 尚未发布。
+- 本轮 Windows `npm.cmd run tauri:build -- --no-sign` 和 `scripts/package-release.ps1` 通过，生成本地 EXE/NSIS/便携 ZIP；未冒充已重做完整原生 UI、安装器安装或下载版启动。
+- [云端 CI](https://github.com/walcracia/muleditor/actions/runs/45581326677) 成功，同一源提交锁定安装、97 前端测试、17 组 Chromium 浏览器回归、9 Rust 测试均通过。前端 artifact 已实际下载，含 index.html 和 123 个 assets；保留至 2026-12-25 17:04 Asia/Shanghai。
+- [Windows Release](https://github.com/walcracia/muleditor/actions/runs/45581334356) 成功，[v0.3.2](https://github.com/walcracia/muleditor/releases/tag/v0.3.2) 已公开发布。三个附件均已实际下载；便携 ZIP 仅 README.txt 和哞-编辑器.exe，README 源提交一致。EXE 版本 `0.3.2`、`NotSigned`、SHA-256 `49e211943b9c5ebd698f37ca8542a8fe62d194dd846a19912e10fa31392e0ad8`；下载版未启动，不把本机编译或浏览器测试冒充下载版原生启动证据。
+- 下载：[便携 ZIP](https://github.com/walcracia/muleditor/releases/download/v0.3.2/MulEditor-0.3.2-windows-x64-portable.zip) SHA-256 `5dcb5c5f55bd67edc6decebdbf6ee357b0088fcf81a9c4a600f5aa06caa536a7`；[安装包](https://github.com/walcracia/muleditor/releases/download/v0.3.2/MulEditor-0.3.2-windows-x64-setup.exe) SHA-256 `58546e6690e93cd91ac65c005e0d3dd9c133768749a055b15d1e0145c9dbbc7d`，均与[校验清单](https://github.com/walcracia/muleditor/releases/download/v0.3.2/SHA256SUMS.txt)匹配。
+- 下一步：本轮需求、验证和发布均已完成。新电脑先检查 Git 状态、fetch；干净工作区 `git pull --ff-only`，首次安装 `npm ci`，再按用户下一项需求继续。既有源码编辑 CDN、未签名与会话不持久化等边界保留在开发文档中。
 
 ## 已完成交接：2026-11-25 可关闭工作区与问题面板
 
