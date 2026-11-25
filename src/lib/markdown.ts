@@ -89,6 +89,13 @@ export function stripFrontMatter(content: string): string {
   return prepareMarkdown(content).content;
 }
 
+/** Shared syntax tokens for editing/import; token maps are offset by lineOffset in the original source. */
+export function tokenizeMarkdown(source: string) {
+  const prepared = prepareMarkdown(source);
+  const environment: Record<string, unknown> = {};
+  return { tokens: createParser().parse(prepared.content, environment), environment, lineOffset: prepared.lineOffset };
+}
+
 /** The only Markdown rendering pipeline, shared by preview and standalone export. */
 export async function renderMarkdownDocument(
   source: string,
