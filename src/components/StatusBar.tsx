@@ -26,7 +26,7 @@ export function StatusBar({ tab, issueCount, locale, status }: StatusBarProps) {
       <span className="statusFilePath" title={tab.path || tab.name}>{tab.path || tab.name}</span>
       <span className="statusMessage" role="status" title={status}>{status}</span>
       <span>{tab.dirty ? text(locale, "common.modified") : text(locale, "common.saved")}</span>
-      <span>{formatLabel(tab.format, locale)}</span>
+      {tab.format === "unknown" ? <span>{formatLabel(tab.format, locale)}</span> : null}
       <span>
         {lineCount} {text(locale, "common.lines")}
       </span>
@@ -35,6 +35,7 @@ export function StatusBar({ tab, issueCount, locale, status }: StatusBarProps) {
         {statusFormats.map(({ format, label }) => (
           <span key={format} role="listitem" data-format={format}
             className={activeFormat === format ? "statusFormat active" : "statusFormat"}
+            title={activeFormat === format ? formatLabel(tab.format, locale) : label}
             aria-current={activeFormat === format ? "true" : undefined}>
             {label}
           </span>
