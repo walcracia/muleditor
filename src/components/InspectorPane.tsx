@@ -12,7 +12,7 @@ interface InspectorPaneProps {
 
 export function InspectorPane({ analysis, locale, onClose, onSelectOutlineItem }: InspectorPaneProps) {
   return (
-    <aside className="inspector">
+    <aside id="outlinePanel" className="inspector" aria-label={text(locale, "panel.outline")}>
       <section className="inspectorSection">
         <div className="panelHeader inspectorTopHeader">
           <span className="panelHeaderTitle">

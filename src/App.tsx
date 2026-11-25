@@ -59,6 +59,8 @@ export function App() {
   const [showDiff, setShowDiff] = useState(false);
   const [diffSourceId, setDiffSourceId] = useState<string>();
   const [showInspector, setShowInspector] = useState(true);
+  const [showWorkspace, setShowWorkspace] = useState(true);
+  const [showProblems, setShowProblems] = useState(true);
   const [isDragActive, setIsDragActive] = useState(false);
   const [markdownResourceVersion, setMarkdownResourceVersion] = useState(0);
   const [status, setStatus] = useState(() => text(initialLocale(), "status.ready"));
@@ -71,6 +73,8 @@ export function App() {
   const commandSerial = useRef(0);
   const lastMarkdownId = useRef(initialTab.id);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const workspaceToggleRef = useRef<HTMLButtonElement>(null);
+  const problemsToggleRef = useRef<HTMLButtonElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
   const startupFilesLoadedRef = useRef(false);
   const dragDepthRef = useRef(0);
@@ -617,7 +621,7 @@ export function App() {
 
   return (
     <div
-      className={isDragActive ? "appShell dragActive" : "appShell"}
+      className={`appShell${isDragActive ? " dragActive" : ""}${showProblems ? "" : " problemsClosed"}`}
       lang={locale === "zh" ? "zh-CN" : "en"}
       onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
@@ -636,7 +640,13 @@ export function App() {
         showPreview={showPreview}
         showDiff={showDiff}
         showInspector={showInspector}
-        status={status}
+        showWorkspace={showWorkspace}
+        showProblems={showProblems}
+        totalIssueCount={analyses.reduce((total, { analysis }) => total + analysis.diagnostics.length, 0)}
+        onToggleWorkspace={() => setShowWorkspace((visible) => !visible)}
+        onToggleProblems={() => setShowProblems((visible) => !visible)}
+        workspaceToggleRef={workspaceToggleRef}
+        problemsToggleRef={problemsToggleRef}
         markdownMode={markdownMode}
         onMarkdownModeChange={handleMarkdownModeChange}
         onNew={handleNew}
@@ -654,8 +664,9 @@ export function App() {
         onToggleLocale={handleToggleLocale}
       />
 
-      <main className={showInspector ? "workbench" : "workbench inspectorClosed"}>
-        <FileSidebar tabs={tabs} activeId={activeTab.id} locale={locale} onSelect={setActiveId} />
+      <main className={`workbench${showInspector ? "" : " inspectorClosed"}${showWorkspace ? "" : " workspaceClosed"}`}>
+        {showWorkspace ? <FileSidebar tabs={tabs} activeId={activeTab.id} locale={locale} onSelect={setActiveId}
+          onClose={() => { setShowWorkspace(false); workspaceToggleRef.current?.focus(); }} /> : null}
         <section className="editorRegion">
           <EditorTabs tabs={tabs} activeId={activeTab.id} locale={locale} onSelect={setActiveId} onClose={handleClose} />
           <FormatNavigationBar
@@ -724,8 +735,9 @@ export function App() {
         ) : null}
       </main>
 
-      <ProblemsPanel diagnosticsByTab={analyses.map(({ tab, analysis }) => ({ tab, diagnostics: analysis.diagnostics }))} locale={locale} />
-      <StatusBar tab={activeTab} issueCount={activeAnalysis.diagnostics.length} runtime={runtime} locale={locale} />
+      {showProblems ? <ProblemsPanel diagnosticsByTab={analyses.map(({ tab, analysis }) => ({ tab, diagnostics: analysis.diagnostics }))} locale={locale}
+        onClose={() => { setShowProblems(false); problemsToggleRef.current?.focus(); }} /> : null}
+      <StatusBar tab={activeTab} issueCount={activeAnalysis.diagnostics.length} runtime={runtime} locale={locale} status={status} />
       <input id="fileInput" ref={fileInputRef} className="hiddenInput" type="file" multiple onChange={handleBrowserFile} />
       <input id="folderInput" ref={folderInputRef} className="hiddenInput" type="file" multiple onChange={handleBrowserFolder} />
     </div>

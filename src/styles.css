@@ -56,6 +56,10 @@ button {
   overflow: hidden;
 }
 
+.appShell.problemsClosed {
+  grid-template-rows: 44px minmax(0, 1fr) 25px;
+}
+
 .dropOverlay {
   position: absolute;
   inset: 0;
@@ -184,51 +188,24 @@ button {
   font-weight: 520;
 }
 
-.formatRail {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  margin-left: 2px;
-}
-
-.formatChip {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 22px;
-  min-width: 38px;
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  background: var(--panel);
-  color: var(--muted);
-  font-size: 10px;
-  font-weight: 760;
-}
-
-.formatChip.active {
-  border-color: #94b9f5;
-  background: #dbeafe;
-  color: #174fa7;
-}
-
-.toolbarStatus {
-  min-width: 0;
-  margin-left: auto;
-  color: var(--muted);
-  font-size: 12px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 .workbench {
+  --workspace-width: 244px;
+  --inspector-width: 304px;
   display: grid;
-  grid-template-columns: 244px minmax(0, 1fr) 304px;
+  grid-template-columns: var(--workspace-width) minmax(0, 1fr) var(--inspector-width);
   min-height: 0;
 }
 
 .workbench.inspectorClosed {
-  grid-template-columns: 244px minmax(0, 1fr);
+  grid-template-columns: var(--workspace-width) minmax(0, 1fr);
+}
+
+.workbench.workspaceClosed {
+  grid-template-columns: minmax(0, 1fr) var(--inspector-width);
+}
+
+.workbench.workspaceClosed.inspectorClosed {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .sidebar,
@@ -1035,6 +1012,13 @@ button.outlineItem:focus-visible {
   height: 31px;
 }
 
+.bottomTabs .problemsCloseButton {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  margin-right: 8px;
+}
+
 .bottomTabs span {
   display: inline-flex;
   align-items: center;
@@ -1114,8 +1098,17 @@ button.outlineItem:focus-visible {
   white-space: nowrap;
 }
 
-.statusBar span:first-child {
+.statusBar .statusFilePath {
   flex: 1;
+}
+
+.statusBar .statusMessage {
+  flex: 1;
+}
+
+.statusBar .statusSupportedFormats {
+  flex: 0 0 auto;
+  color: #c0d3e8;
 }
 
 .hiddenInput {
@@ -1124,7 +1117,8 @@ button.outlineItem:focus-visible {
 
 @media (max-width: 1360px) {
   .workbench {
-    grid-template-columns: 220px minmax(0, 1fr) 260px;
+    --workspace-width: 220px;
+    --inspector-width: 260px;
   }
 
   .editorSplit.withPreview {
@@ -1132,10 +1126,6 @@ button.outlineItem:focus-visible {
   }
 
   .editorSplit.withPreview .preview {
-    display: none;
-  }
-
-  .formatRail {
     display: none;
   }
 
@@ -1150,6 +1140,9 @@ button.outlineItem:focus-visible {
 
 @media (max-width: 1200px) {
   .toolbar { gap: 6px; }
-  .toolbarGroup button { padding-inline: 7px; }
+  .toolbarGroup button { padding-inline: 5px; gap: 4px; }
+  .toolbarGroup.compact button { min-width: 44px; }
+  .toolbarUtilityButton span { display: none; }
   .toolbarFileActions .toolbarGroup button > svg:first-child { display: none; }
+  .statusBar { gap: 10px; }
 }
