@@ -7,7 +7,7 @@ import { history, undo, redo } from "prosemirror-history";
 import { keymap } from "prosemirror-keymap";
 import { inputRules, wrappingInputRule, textblockTypeInputRule, undoInputRule } from "prosemirror-inputrules";
 import { wrapInList, splitListItem, sinkListItem, liftListItem } from "prosemirror-schema-list";
-import { tableEditing, columnResizing, goToNextCell, addRowAfter, addColumnAfter, deleteRow, deleteColumn, deleteTable } from "prosemirror-tables";
+import { tableEditing, goToNextCell, addRowAfter, addColumnAfter, deleteRow, deleteColumn, deleteTable } from "prosemirror-tables";
 import { dropCursor } from "prosemirror-dropcursor";
 import { gapCursor } from "prosemirror-gapcursor";
 import type { Node as ProseMirrorNode } from "prosemirror-model";
@@ -16,6 +16,7 @@ import type { Locale } from "../lib/i18n";
 import { immersiveSchema as schema, parseImmersiveMarkdown, isSafeImmersiveLink } from "../lib/immersiveMarkdown";
 import { extractMarkdownAnchors, extractMarkdownHeadings, renderMarkdownDocument } from "../lib/markdown";
 import { resolveMarkdownImage } from "../lib/markdownResources";
+import "prosemirror-view/style/prosemirror.css";
 import "../immersive.css";
 
 export interface ImmersiveToolbarState {
@@ -104,6 +105,8 @@ export function ImmersiveEditor(props: ImmersiveEditorProps) {
       let id = href.slice(1);
       try { id = decodeURIComponent(id); } catch { /* Preserve a literal fragment. */ }
       const target = Array.from(view.dom.querySelectorAll<HTMLElement>("[id]")).find((element) => element.id === id);
+      const body = target?.closest<HTMLElement>(".immersiveInlineFootnoteBody");
+      if (body) body.hidden = false;
       target?.scrollIntoView({ block: "center" });
     } else if (/^https?:\/\//i.test(href)) {
       window.open(href, "_blank", "noopener,noreferrer");
@@ -118,14 +121,28 @@ export function ImmersiveEditor(props: ImmersiveEditorProps) {
     const context = () => current.current;
     const entry = () => documents.current.get(shownTab.current ?? "");
     const getSource = () => entry()?.source ?? context().tab.content;
+    const documentRender = new SharedDocumentRender(context, getSource);
     const open = (kind: FormKind, node?: ProseMirrorNode, position?: number) => {
       const view = viewRef.current;
       if (!view || context().active === false) return;
+      if (kind === "footnote" && node) {
+        if (String(node.attrs.source).startsWith("^[")) {
+          open("raw", node, position);
+          return;
+        }
+        let definition: { node: ProseMirrorNode; position: number } | undefined;
+        view.state.doc.descendants((candidate, pos) => {
+          if (candidate.type.name === "raw_block" && footnoteLabels(candidate.attrs.source).has(node.attrs.label)) definition = { node: candidate, position: pos };
+        });
+        if (definition) open("raw", definition.node, definition.position);
+        else setError(context().locale === "zh" ? "请在源代码模式编辑此脚注定义。" : "Edit this footnote definition in source mode.");
+        return;
+      }
       const selected = view.state.doc.textBetween(view.state.selection.from, view.state.selection.to, " ");
       const link = view.state.storedMarks?.find((mark) => mark.type === schema.marks.link) ?? view.state.selection.$from.marks().find((mark) => mark.type === schema.marks.link);
       setForm({
         kind, tabId: context().tab.id, bookmark: view.state.selection.getBookmark(), doc: view.state.doc, position, node,
-        source: node ? (node.type.name === "inline_math" || node.type.name.startsWith("raw_") ? node.attrs.source ?? "" : node.textContent) : kind === "mermaid" ? "flowchart LR\n  A --> B" : kind === "math" ? "x^2 + y^2 = z^2" : kind === "footnote" ? "" : kind === "emoji" ? "😊" : "",
+        source: node ? (kind === "raw" || node.type.name === "inline_math" || node.type.name.startsWith("raw_") ? node.attrs.source ?? "" : node.textContent) : kind === "mermaid" ? "flowchart LR\n  A --> B" : kind === "math" ? "x^2 + y^2 = z^2" : kind === "footnote" ? "" : kind === "emoji" ? "😊" : "",
         label: node?.type.name === "image" ? node.attrs.alt ?? "" : node?.type.name === "footnote_ref" ? node.attrs.label ?? "" : kind === "footnote" ? `note-${Date.now().toString(36)}` : selected,
         href: node?.type.name === "image" ? node.attrs.src ?? "" : link?.attrs.href ?? ""
       });
@@ -159,7 +176,7 @@ export function ImmersiveEditor(props: ImmersiveEditorProps) {
         },
         "Shift-Tab": (state, dispatch) => ancestor(state, "table") ? goToNextCell(-1)(state, dispatch) : liftListItem(schema.nodes.list_item)(state, dispatch)
       }),
-      keymap(baseKeymap), columnResizing(), tableEditing(), dropCursor(), gapCursor(),
+      keymap(baseKeymap), tableEditing(), dropCursor(), gapCursor(),
       headingDecorations(getSource), syntaxDecorations(context)
     ];
 
@@ -174,7 +191,7 @@ export function ImmersiveEditor(props: ImmersiveEditorProps) {
     const nodeViews: Record<string, (node: ProseMirrorNode, view: EditorView, getPos: () => number | undefined) => NodeView> = {};
     for (const name of ["math_block", "mermaid_block", "image", "inline_math", "footnote_ref", "raw_inline", "raw_block"]) {
       nodeViews[name] = (node, view, getPos) => {
-        const instance = new RichNodeView(node, view, getPos, context, getSource, open, () => atoms.current.delete(instance));
+        const instance = new RichNodeView(node, view, getPos, context, getSource, documentRender, open, () => atoms.current.delete(instance));
         atoms.current.add(instance);
         return instance;
       };
@@ -235,9 +252,18 @@ export function ImmersiveEditor(props: ImmersiveEditorProps) {
     viewRef.current = view;
     syncRef.current = () => {
       if (destroyed) return;
-      view.setProps({ editable: () => context().active !== false, attributes: { class: "markdownBody immersiveDocument", role: "textbox", "aria-multiline": "true", "aria-label": labels[context().locale].editor } });
+      // An echo of our own source must not refresh the view between native
+      // caret movement and the browser's pending selectionchange event.
+      if (view.dom.getAttribute("contenteditable") !== String(context().active !== false) || view.dom.getAttribute("aria-label") !== labels[context().locale].editor) {
+        view.setProps({ editable: () => context().active !== false, attributes: { class: "markdownBody immersiveDocument", role: "textbox", "aria-multiline": "true", "aria-label": labels[context().locale].editor } });
+      }
       const tab = context().tab;
-      if (context().active === false || (view.composing && shownTab.current === tab.id)) return;
+      if (context().active === false) {
+        documentRender.clear();
+        for (const atom of atoms.current) atom.pause();
+        return;
+      }
+      if (view.composing && shownTab.current === tab.id) return;
       const previousId = shownTab.current;
       if (previousId) {
         const previous = documents.current.get(previousId);
@@ -245,12 +271,14 @@ export function ImmersiveEditor(props: ImmersiveEditorProps) {
       }
       let nextEntry = documents.current.get(tab.id);
       if (!nextEntry || nextEntry.source !== tab.content) {
+        documentRender.clear();
         const oldAnchor = nextEntry?.state.selection.anchor ?? 1;
         nextEntry = createEntry(tab.content);
         nextEntry.state = nextEntry.state.apply(nextEntry.state.tr.setSelection(TextSelection.near(nextEntry.state.doc.resolve(Math.min(oldAnchor, nextEntry.state.doc.content.size)))));
         documents.current.set(tab.id, nextEntry);
       }
       shownTab.current = tab.id;
+      if (previousId !== tab.id) documentRender.clear();
       if (view.state !== nextEntry.state) view.updateState(nextEntry.state);
       if (previousId !== tab.id) {
         setForm(undefined);
@@ -296,6 +324,7 @@ export function ImmersiveEditor(props: ImmersiveEditorProps) {
     publishState(view);
     return () => {
       destroyed = true;
+      documentRender.clear();
       view.destroy();
       viewRef.current = undefined;
       documents.current.clear();
@@ -308,7 +337,7 @@ export function ImmersiveEditor(props: ImmersiveEditorProps) {
     if (props.active === false) return;
     syncRef.current();
     for (const node of atoms.current) node.refresh();
-  }, [props.locale, props.resourceVersion, props.active]);
+  }, [props.locale, props.resourceVersion, props.active, props.tab.id, props.tab.path, props.tab.relativePath, props.tab.workspaceRoot]);
   useEffect(() => {
     if (!props.command) return;
     if (props.active === false) { lastCommand.current = props.command.id; return; }
@@ -352,7 +381,10 @@ export function ImmersiveEditor(props: ImmersiveEditorProps) {
           ? schema.nodes.inline_math.create({ ...existing.attrs, source: form.source })
           : schema.nodes.math_block.create({ ...(existing?.attrs ?? {}), delimiter: existing?.attrs.delimiter ?? "$$" }, form.source ? schema.text(form.source) : undefined);
         else if (form.kind === "mermaid") node = schema.nodes.mermaid_block.create(existing?.attrs, form.source ? schema.text(form.source) : undefined);
-        else if (form.kind === "footnote") node = schema.nodes.footnote_ref.create({ ...(existing?.attrs ?? {}), label: form.label.trim() || "note", source: `[^${form.label.trim() || "note"}]` });
+        else if (form.kind === "footnote") {
+          if (!/^[^\s\[\]]+$/.test(form.label.trim())) throw new Error(props.locale === "zh" ? "脚注标识不能包含空格或方括号。" : "Footnote labels cannot contain spaces or square brackets.");
+          node = schema.nodes.footnote_ref.create({ ...(existing?.attrs ?? {}), label: form.label.trim(), source: `[^${form.label.trim()}]` });
+        }
         else node = existing!.type.create({ ...existing!.attrs, source: form.source });
         transaction = position != null ? transaction.replaceWith(position, position + existing!.nodeSize, node) : transaction.replaceSelectionWith(node);
         if (form.kind === "footnote" && position == null) {
@@ -481,13 +513,14 @@ function syntaxDecorations(context: () => ImmersiveEditorProps): Plugin<Decorati
         if (timer) clearTimeout(timer);
         controller?.abort();
         if (context().active === false) return;
+        const blocks: { node: ProseMirrorNode; position: number }[] = [];
+        view.state.doc.descendants((node, position) => { if (node.type.name === "code_block") blocks.push({ node, position }); });
+        if (!blocks.length && !plugin.getState(view.state)?.find().length) return;
         const current = new AbortController();
         controller = current;
         timer = setTimeout(async () => {
           const doc = view.state.doc;
           const decorations: Decoration[] = [];
-          const blocks: { node: ProseMirrorNode; position: number }[] = [];
-          doc.descendants((node, position) => { if (node.type.name === "code_block") blocks.push({ node, position }); });
           try {
             for (const { node, position } of blocks) {
               const language = String(node.attrs.language || "text").replace(/[^a-z\d_+-]/gi, "");
@@ -507,7 +540,7 @@ function syntaxDecorations(context: () => ImmersiveEditorProps): Plugin<Decorati
                 if (to > from && to <= position + node.nodeSize - 1) decorations.push(Decoration.inline(from, to, { class: token.className }));
               }
             }
-            if (!current.signal.aborted && view.state.doc === doc) view.dispatch(view.state.tr.setMeta("immersiveSyntax", DecorationSet.create(doc, decorations)).setMeta("addToHistory", false));
+            if (!current.signal.aborted && view.state.doc === doc && nativeSelectionIsCurrent(view)) view.dispatch(view.state.tr.setMeta("immersiveSyntax", DecorationSet.create(doc, decorations)).setMeta("addToHistory", false));
           } catch { /* Source remains editable if syntax highlighting fails. */ }
         }, 120);
       };
@@ -518,13 +551,50 @@ function syntaxDecorations(context: () => ImmersiveEditorProps): Plugin<Decorati
   return plugin;
 }
 
+function nativeSelectionIsCurrent(view: EditorView): boolean {
+  if (view.composing) return false;
+  if (!view.hasFocus()) return true;
+  const selection = view.dom.ownerDocument.getSelection();
+  if (!selection?.anchorNode || !selection.focusNode) return true;
+  try {
+    return view.posAtDOM(selection.anchorNode, selection.anchorOffset) === view.state.selection.anchor &&
+      view.posAtDOM(selection.focusNode, selection.focusOffset) === view.state.selection.head;
+  } catch { return false; }
+}
+
+/** One complete document render shared by all reference/definition node views. */
+class SharedDocumentRender {
+  private cached?: { key: string; source: string; controller: AbortController; promise: ReturnType<typeof renderMarkdownDocument> };
+  constructor(private context: () => ImmersiveEditorProps, private source: () => string) {}
+  render() {
+    const props = this.context();
+    const source = this.source();
+    const key = JSON.stringify([props.tab.id, props.tab.path, props.tab.relativePath, props.tab.workspaceRoot, props.locale, props.resourceVersion]);
+    if (this.cached?.key === key && this.cached.source === source) return this.cached.promise;
+    this.clear();
+    const controller = new AbortController();
+    const promise = renderMarkdownDocument(source, {
+      signal: controller.signal,
+      errorLabel: props.locale === "zh" ? "图表渲染失败" : "Unable to render diagram",
+      resolveImage: (src) => resolveMarkdownImage(src, { sourcePath: props.tab.path, relativePath: props.tab.relativePath, workspaceRoot: props.tab.workspaceRoot })
+    });
+    this.cached = { key, source, controller, promise };
+    return promise;
+  }
+  clear() { this.cached?.controller.abort(); this.cached = undefined; }
+}
+
+function footnoteLabels(source: unknown): Set<string> {
+  return new Set(Array.from(String(source ?? "").matchAll(/^ {0,3}\[\^([^\]\s]+)\]:/gm), (match) => match[1]));
+}
+
 class RichNodeView implements NodeView {
   dom: HTMLElement;
   private preview: HTMLElement;
   private button: HTMLButtonElement;
   private controller?: AbortController;
   private disposed = false;
-  constructor(private node: ProseMirrorNode, private view: EditorView, private getPos: () => number | undefined, private context: () => ImmersiveEditorProps, private source: () => string, private open: (kind: FormKind, node?: ProseMirrorNode, position?: number) => void, private remove: () => void) {
+  constructor(private node: ProseMirrorNode, private view: EditorView, private getPos: () => number | undefined, private context: () => ImmersiveEditorProps, private source: () => string, private documentRender: SharedDocumentRender, private open: (kind: FormKind, node?: ProseMirrorNode, position?: number) => void, private remove: () => void) {
     this.dom = document.createElement(node.isBlock ? "div" : "span");
     this.dom.className = `immersiveNodeView immersiveNode-${node.type.name}`;
     this.dom.contentEditable = "false";
@@ -550,19 +620,20 @@ class RichNodeView implements NodeView {
     this.button.textContent = `${words.edit} ${words[this.kind()]}`;
     this.button.setAttribute("aria-label", `${words.edit} ${words[this.kind()]}`);
     const node = this.node;
+    const documentSource = this.source();
     let source = node.attrs.source ?? node.textContent;
     if (node.type.name === "image") source = `<img src="${escapeAttribute(String(node.attrs.src ?? ""))}" alt="${escapeAttribute(String(node.attrs.alt ?? ""))}">`;
     else if (node.type.name === "inline_math") source = `${node.attrs.delimiter === "\\(" ? "\\(" : "$"}${source}${node.attrs.delimiter === "\\(" ? "\\)" : "$"}`;
     else if (node.type.name === "math_block") source = `$$\n${node.textContent}\n$$`;
     else if (node.type.name === "mermaid_block") source = `\`\`\`mermaid\n${node.textContent}\n\`\`\``;
-    else if (this.dependsOnDocument) source = this.source();
+    else if (this.dependsOnDocument) source = documentSource;
     try {
-      const rendered = await renderMarkdownDocument(source, {
+      const rendered = await (this.dependsOnDocument ? this.documentRender.render() : renderMarkdownDocument(source, {
         signal: controller.signal,
         errorLabel: props.locale === "zh" ? "图表渲染失败" : "Unable to render diagram",
         resolveImage: (src) => resolveMarkdownImage(src, { sourcePath: props.tab.path, relativePath: props.tab.relativePath, workspaceRoot: props.tab.workspaceRoot })
-      });
-      if (controller.signal.aborted || this.disposed) return;
+      }));
+      if (controller.signal.aborted || this.disposed || this.context().tab.id !== props.tab.id || (this.dependsOnDocument && documentSource !== this.source())) return;
       this.dom.classList.remove("immersiveNodeError");
       const root = document.createElement("div");
       root.innerHTML = rendered.html;
@@ -571,11 +642,48 @@ class RichNodeView implements NodeView {
         const position = this.getPos() ?? 0;
         let previous = 0;
         this.view.state.doc.nodesBetween(0, position, (candidate) => { if (candidate.type.name === "footnote_ref" && candidate.attrs.label === node.attrs.label) previous++; });
-        const ref = extractMarkdownAnchors(this.source()).filter((anchor) => anchor.kind === "footnote-ref" && anchor.text === `[^${node.attrs.label}]`)[previous];
+        const ref = extractMarkdownAnchors(documentSource).filter((anchor) => anchor.kind === "footnote-ref" && anchor.text === `[^${node.attrs.label}]`)[previous];
         const target = Array.from(root.querySelectorAll<HTMLElement>("[id]")).find((element) => element.id === ref?.id);
         this.preview.innerHTML = target?.outerHTML ?? "";
         if (!target) this.preview.textContent = node.attrs.source || `[^${node.attrs.label}]`;
-      } else if (node.type.name === "raw_block" && node.attrs.kind === "definitions") this.preview.innerHTML = root.querySelector(".footnotes")?.outerHTML ?? "";
+        if (String(node.attrs.source).startsWith("^[") && ref) {
+          const body = Array.from(root.querySelectorAll<HTMLElement>(".footnote-item")).find((item) => item.id === target?.getAttribute("href")?.slice(1));
+          if (body) {
+            const content = document.createElement("span");
+            content.className = "immersiveInlineFootnoteBody footnotes";
+            content.hidden = true;
+            const list = document.createElement("ol");
+            list.className = "footnotes-list";
+            body.setAttribute("value", String(Array.from(root.querySelectorAll(".footnote-item")).indexOf(body) + 1));
+            list.append(body);
+            const collapse = document.createElement("button");
+            collapse.type = "button";
+            collapse.className = "immersiveNodeEdit";
+            collapse.textContent = props.locale === "zh" ? "收起脚注" : "Collapse footnote";
+            collapse.addEventListener("click", () => { content.hidden = true; });
+            content.append(list, collapse);
+            this.preview.append(content);
+          }
+        }
+      } else if (node.type.name === "raw_block" && node.attrs.kind === "definitions") {
+        // markdown-it uses the last definition for duplicate labels. Render each
+        // generated item only at the raw block that owns that definition.
+        const owners = new Map<string, number>();
+        this.view.state.doc.descendants((candidate, position) => {
+          if (candidate.type.name === "raw_block" && candidate.attrs.kind === "definitions") {
+            for (const label of footnoteLabels(candidate.attrs.source)) owners.set(label, position);
+          }
+        });
+        const labels = footnoteLabels(node.attrs.source);
+        const anchors = extractMarkdownAnchors(documentSource).filter((anchor) => anchor.kind === "footnote" && labels.has(anchor.text.slice(2, -1)) && owners.get(anchor.text.slice(2, -1)) === this.getPos());
+        const ids = new Set(anchors.map((anchor) => anchor.id));
+        const section = root.querySelector<HTMLElement>(".footnotes");
+        section?.querySelectorAll<HTMLElement>(".footnote-item").forEach((item, index) => {
+          if (!ids.has(item.id)) item.remove();
+          else item.setAttribute("value", String(index + 1));
+        });
+        this.preview.innerHTML = section?.querySelector(".footnote-item") ? section.outerHTML : "";
+      }
       else this.preview.innerHTML = node.isInline && root.firstElementChild?.tagName === "P" ? root.firstElementChild.innerHTML : rendered.html;
       if (!this.preview.textContent?.trim() && !this.preview.querySelector("img, svg, .katex")) {
         const fallback = document.createElement("pre");
@@ -588,6 +696,7 @@ class RichNodeView implements NodeView {
     }
   }
   update(node: ProseMirrorNode) { if (node.type !== this.node.type) return false; if (!node.eq(this.node)) { this.node = node; void this.refresh(); } return true; }
+  pause() { this.controller?.abort(); }
   selectNode() { this.dom.classList.add("ProseMirror-selectednode"); }
   deselectNode() { this.dom.classList.remove("ProseMirror-selectednode"); }
   stopEvent(event: Event) { return event.target instanceof Element && Boolean(event.target.closest("button")); }
