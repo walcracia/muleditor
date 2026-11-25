@@ -128,6 +128,144 @@ test("source changes synchronize back to immersive mode without losing the sourc
   expect((await downloadDocument(page)).toString("utf8")).toBe(replacement);
 });
 
+test("formula and diagram forms insert and edit rendered nodes without typing Markdown fences", async ({ page }) => {
+  await page.goto("/");
+  await page.locator("#fileInput").setInputFiles({ name: "forms.md", mimeType: "text/markdown", buffer: Buffer.from("# 表单编辑\n\n结尾段落。\n") });
+  const editor = immersiveEditor(page);
+  const toolbar = page.locator(".formatNavLine");
+  const form = page.locator(".immersiveInsertForm");
+  await editor.locator("p").filter({ hasText: "结尾段落。" }).click();
+  await page.keyboard.press("End");
+  await toolbar.getByRole("button", { name: "插入公式", exact: true }).click();
+  await form.getByLabel("公式源码", { exact: true }).fill("a^2+b^2=c^2");
+  await form.getByRole("button", { name: "应用", exact: true }).click();
+  await expect(editor.locator(".immersiveNode-math_block .katex")).toHaveCount(1);
+  await editor.getByRole("button", { name: /^编辑\s*公式$/ }).click();
+  await form.getByLabel("公式源码", { exact: true }).fill("\\frac{1}{2}");
+  await form.getByRole("button", { name: "应用", exact: true }).click();
+  await expect(editor.locator(".katex .mfrac")).toHaveCount(1);
+
+  await editor.locator("p").filter({ hasText: "结尾段落。" }).click();
+  await page.keyboard.press("End");
+  await toolbar.getByRole("button", { name: "插入图表", exact: true }).click();
+  await form.getByLabel("图表源码", { exact: true }).fill("flowchart LR\n A[新增起点] --> B[新增终点]");
+  await form.getByRole("button", { name: "应用", exact: true }).click();
+  await expect(editor.locator(".mermaidDiagram svg")).toContainText("新增起点");
+  await editor.getByRole("button", { name: /^编辑\s*图表$/ }).click();
+  await form.getByLabel("图表源码", { exact: true }).fill("flowchart TD\n A[修改后] --> B[完成]");
+  await form.getByRole("button", { name: "应用", exact: true }).click();
+  await expect(editor.locator(".mermaidDiagram svg")).toContainText("修改后");
+  await expect(editor.locator(".mermaidDiagram svg")).not.toContainText("新增起点");
+  const source = (await downloadDocument(page)).toString("utf8");
+  expect(source).toContain("\\frac{1}{2}");
+  expect(source).toContain("flowchart TD");
+  expect(source).toContain("A[修改后]");
+  expect(source).not.toContain("a^2+b^2=c^2");
+  const html = (await downloadDocument(page, "export")).toString("utf8");
+  expect(html).toContain("<svg");
+  expect(html).toContain("katex");
+  expect(html).not.toContain("language-mermaid");
+});
+
+test("task checkboxes and table cell typing serialize their actual edited state", async ({ page }) => {
+  await page.goto("/");
+  const source = "# 任务与表格\n\n- [ ] 待办一\n- [x] 已完成二\n\n| 名称 | 值 |\n| --- | --- |\n| 原单元格 | 原值 |\n";
+  await page.locator("#fileInput").setInputFiles({ name: "table-tasks.md", mimeType: "text/markdown", buffer: Buffer.from(source) });
+  const editor = immersiveEditor(page);
+  const tasks = editor.locator("li.immersiveTaskItem input[type='checkbox']");
+  await expect(tasks).toHaveCount(2);
+  await tasks.nth(0).check();
+  await tasks.nth(1).uncheck();
+  await expect(tasks.nth(0)).toBeChecked();
+  await expect(tasks.nth(1)).not.toBeChecked();
+  const cells = editor.locator("table tr").nth(1).locator("td");
+  await cells.nth(0).click();
+  await page.keyboard.press("Home");
+  await page.keyboard.press("Shift+End");
+  await page.keyboard.insertText("更新单元格");
+  await page.keyboard.press("Tab");
+  await page.keyboard.press("Home");
+  await page.keyboard.press("Shift+End");
+  await page.keyboard.insertText("第二格");
+  await expect(cells.nth(0)).toHaveText("更新单元格");
+  await expect(cells.nth(1)).toHaveText("第二格");
+  await expect(page.locator(".immersiveTableTools")).toBeVisible();
+  const saved = (await downloadDocument(page)).toString("utf8");
+  expect(saved).toMatch(/[-*+] \[[xX]\] 待办一/);
+  expect(saved).toMatch(/[-*+] \[ \] 已完成二/);
+  expect(saved).toContain("更新单元格");
+  expect(saved).toContain("第二格");
+  expect(saved).not.toContain("原单元格");
+});
+
+test("toolbar undo and redo restore document content and dirty state", async ({ page }) => {
+  await page.goto("/");
+  const original = "初始正文。\n";
+  await page.locator("#fileInput").setInputFiles({ name: "history.md", mimeType: "text/markdown", buffer: Buffer.from(original) });
+  const editor = immersiveEditor(page);
+  const toolbar = page.locator(".formatNavLine");
+  const undo = toolbar.getByRole("button", { name: "撤销", exact: true });
+  const redo = toolbar.getByRole("button", { name: "重做", exact: true });
+  await expect(undo).toBeDisabled();
+  await editor.locator("p").click();
+  await page.keyboard.press("End");
+  await page.keyboard.insertText("撤销重做标记。");
+  await expect(undo).toBeEnabled();
+  await expect(page.locator(".statusBar")).toContainText("已修改");
+  await undo.click();
+  await expect(editor).not.toContainText("撤销重做标记。");
+  await expect(page.locator(".statusBar")).toContainText("已保存");
+  expect((await downloadDocument(page)).toString("utf8")).toBe(original);
+  await expect(redo).toBeEnabled();
+  await redo.click();
+  await expect(editor).toContainText("撤销重做标记。");
+  await expect(page.locator(".statusBar")).toContainText("已修改");
+  expect((await downloadDocument(page)).toString("utf8")).toContain("撤销重做标记。");
+});
+
+test("late initial Monaco loading cannot steal immersive focus or write into another tab", async ({ page }) => {
+  let releaseLoader!: () => void;
+  const loaderGate = new Promise<void>((resolve) => { releaseLoader = resolve; });
+  await page.route("**/vs/loader.js", async (route) => {
+    await loaderGate;
+    await route.continue();
+  });
+  const first = "# First\n\nA 原始正文。\n";
+  const second = "# Second\n\nB 原始正文。\n";
+  try {
+    await page.goto("/");
+    await page.locator("#fileInput").setInputFiles([
+      { name: "first.md", mimeType: "text/markdown", buffer: Buffer.from(first) },
+      { name: "second.md", mimeType: "text/markdown", buffer: Buffer.from(second) }
+    ]);
+    await page.locator(".tabs .tab").filter({ hasText: "first.md" }).click();
+    const requested = page.waitForRequest("**/vs/loader.js");
+    await switchMarkdownMode(page, "source");
+    await requested;
+    // Queue a source action, then leave this tab before the source editor is ready.
+    await page.locator(".formatNavLine").getByRole("button", { name: "加粗", exact: true }).click();
+    await switchMarkdownMode(page, "immersive");
+    await page.locator(".tabs .tab").filter({ hasText: "second.md" }).click();
+    const editor = immersiveEditor(page);
+    await editor.locator("p").filter({ hasText: "B 原始正文。" }).click();
+    await page.keyboard.press("End");
+    await expect(editor).toBeFocused();
+    releaseLoader();
+    await expect(page.locator(".editorSurface[hidden] .monaco-editor").first()).toBeAttached();
+    await expect(editor).toBeFocused();
+    await page.keyboard.insertText("加载后仍在当前段落。");
+    const savedSecond = (await downloadDocument(page)).toString("utf8");
+    expect(savedSecond).toContain("B 原始正文。加载后仍在当前段落。");
+    expect(savedSecond).not.toContain("A 原始正文");
+    expect(savedSecond).not.toContain("**bold**");
+    await page.locator(".tabs .tab").filter({ hasText: "first.md" }).click();
+    await expect(immersiveEditor(page).getByRole("heading", { name: "First" })).toBeVisible();
+    expect((await downloadDocument(page)).toString("utf8")).toBe(first);
+  } finally {
+    releaseLoader();
+  }
+});
+
 test("HTML, XML, YAML, JSON and SPDX retain source editing, saving and export behavior", async ({ page }) => {
   await page.goto("/");
   const cases = [
