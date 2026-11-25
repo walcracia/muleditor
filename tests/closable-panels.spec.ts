@@ -117,6 +117,7 @@ test("panel close and reopen controls remain available in both languages and des
       await expectInsideViewport(page, workspaceToggle);
       await expectInsideViewport(page, problemsToggle);
       const original = await bounds(page.locator(".editorRegion"));
+      await page.screenshot({ path: testInfo.outputPath(`panels-${locale}-${width}-open.png`) });
       await workspace.getByRole("button", { name: locale === "zh" ? "关闭工作区" : /close workspace/i }).click();
       await problems.getByRole("button", { name: locale === "zh" ? "关闭问题面板" : /close problems/i }).click();
       await expect(workspace).toBeHidden();
