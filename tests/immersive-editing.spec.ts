@@ -275,27 +275,28 @@ test("late initial Monaco loading cannot steal immersive focus or write into ano
   }
 });
 
-test("HTML, XML, YAML, JSON and SPDX retain source editing, saving and export behavior", async ({ page }) => {
-  await page.goto("/");
-  const cases = [
-    { name: "data.json", mimeType: "application/json", source: '{ "n": 1 }\n', exported: '{"n":1}' },
-    { name: "config.yaml", mimeType: "text/yaml", source: "# Keep YAML comments\nname: editor\nenabled: true\n" },
-    { name: "document.xml", mimeType: "application/xml", source: '<?xml version="1.0"?><root><item>value</item></root>\n' },
-    { name: "page.html", mimeType: "text/html", source: "<!doctype html><html><body><h1>HTML document</h1></body></html>\n" },
-    { name: "bom.spdx.json", mimeType: "application/json", source: '{ "spdxVersion": "SPDX-2.3", "SPDXID": "SPDXRef-DOCUMENT", "name": "fixture" }\n', exported: '{"spdxVersion":"SPDX-2.3","SPDXID":"SPDXRef-DOCUMENT","name":"fixture"}' },
-    { name: "bom.spdx.yaml", mimeType: "text/yaml", source: "spdxVersion: SPDX-2.3\nSPDXID: SPDXRef-DOCUMENT\nname: fixture\n" },
-    { name: "bom.spdx", mimeType: "text/plain", source: "SPDXVersion: SPDX-2.3\nDocumentName: fixture\nSPDXID: SPDXRef-DOCUMENT\n" }
-  ];
-  for (const fixture of cases) {
-    await test.step(fixture.name, async () => {
-      await page.locator("#fileInput").setInputFiles({ name: fixture.name, mimeType: fixture.mimeType, buffer: Buffer.from(fixture.source) });
-      await expect(immersiveEditor(page)).toBeHidden();
-      await expect(page.getByRole("button", { name: "沉浸模式", exact: true })).toHaveCount(0);
-      await expect(page.getByRole("button", { name: /^(编辑|Edit)$/ })).toBeVisible();
-      await expect(page.getByRole("button", { name: /^(预览|Preview)$/ })).toBeVisible();
-      await expect(page.locator(".monaco-editor:visible").first()).toBeVisible();
-      expect((await downloadDocument(page)).toString("utf8")).toBe(fixture.source);
-      expect((await downloadDocument(page, "export")).toString("utf8")).toBe(fixture.exported ?? fixture.source);
-    });
-  }
-});
+const sourceFormatCases = [
+  { name: "data.json", mimeType: "application/json", source: '{ "n": 1 }\n', exported: '{"n":1}' },
+  { name: "config.yaml", mimeType: "text/yaml", source: "# Keep YAML comments\nname: editor\nenabled: true\n" },
+  { name: "document.xml", mimeType: "application/xml", source: '<?xml version="1.0"?><root><item>value</item></root>\n' },
+  { name: "page.html", mimeType: "text/html", source: "<!doctype html><html><body><h1>HTML document</h1></body></html>\n" },
+  { name: "bom.spdx.json", mimeType: "application/json", source: '{ "spdxVersion": "SPDX-2.3", "SPDXID": "SPDXRef-DOCUMENT", "name": "fixture" }\n', exported: '{"spdxVersion":"SPDX-2.3","SPDXID":"SPDXRef-DOCUMENT","name":"fixture"}' },
+  { name: "bom.spdx.yaml", mimeType: "text/yaml", source: "spdxVersion: SPDX-2.3\nSPDXID: SPDXRef-DOCUMENT\nname: fixture\n" },
+  { name: "bom.spdx", mimeType: "text/plain", source: "SPDXVersion: SPDX-2.3\nDocumentName: fixture\nSPDXID: SPDXRef-DOCUMENT\n" }
+];
+
+// Each format gets a fresh context: fourteen rapid downloads in one page can
+// trigger Chromium's download guard instead of testing the next format.
+for (const fixture of sourceFormatCases) {
+  test(`source editing, saving and export preserve ${fixture.name}`, async ({ page }) => {
+    await page.goto("/");
+    await page.locator("#fileInput").setInputFiles({ name: fixture.name, mimeType: fixture.mimeType, buffer: Buffer.from(fixture.source) });
+    await expect(immersiveEditor(page)).toBeHidden();
+    await expect(page.getByRole("button", { name: "沉浸模式", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /^(编辑|Edit)$/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /^(预览|Preview)$/ })).toBeVisible();
+    await expect(page.locator(".monaco-editor:visible").first()).toBeVisible();
+    expect((await downloadDocument(page)).toString("utf8")).toBe(fixture.source);
+    expect((await downloadDocument(page, "export")).toString("utf8")).toBe(fixture.exported ?? fixture.source);
+  });
+}

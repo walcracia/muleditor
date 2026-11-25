@@ -19,7 +19,10 @@
 - 实现入口：`src/components/StatusBar.tsx`、`src/styles.css`；格式仍直接派生 `DocumentTab.format`，不引入额外状态。回归位于 `tests/status-format.spec.ts`，保留原有两组并增加单一指示、悬停具体类型及实际颜色对比断言。
 - 本轮 Windows x64、Node 22.14.0/npm 10.9.2、Rust 1.99.1：`npm run check`、`npm run build`、97 项前端测试、版本校验通过；`cargo check` / `cargo test`（`--manifest-path src-tauri/Cargo.toml --locked -j 1`）9 项通过。依赖仅项目版本变化，沿用本会话已完成的 `npm ci`；云端重新锁定安装。
 - 原有 17 组 Edge 浏览器回归通过，增强断言后的 2 组格式专项再次通过。实测六类/三个 SPDX 变体切换，保存原文和 dirty 不变；当前底色与状态栏对比至少 7:1，文字与底色至少 4.5:1，中英文 1600/1040 均可见。截图：[MD/中文](assets/muleditor-0.3.3-format-zh.png)、[JSON/英文最小窗口](assets/muleditor-0.3.3-format-en-minimum.png)。保留既有大 chunk 构建提示。
-- 当前阶段：本地源码与浏览器验证完成，待从包含本交接的干净提交构建、推送并发布 0.3.3；稳定下载仍为 0.3.2。本段不是原生构建或云端发布完成证明。下一步运行 `npm.cmd run tauri:build -- --no-sign`、标准打包脚本，推送 main/新标签，核对 CI、Release 与实际下载后回填。
+- 发行源 `c8ab7120ee49314a6beb35e4db21695cdf57ecc1` 已推送 main 并创建新标签 v0.3.3。[Windows Release](https://github.com/walcracia/muleditor/actions/runs/45585922801) 成功，实际下载与校验待核对；已发布标签和附件不移动、不替换。
+- 本机原生构建两次未完成：首次前端预构建退出 `-1073741819`；限制 Node 堆至 768 MiB 后明确报 `Fatal process out of memory: Zone`，退出 `-2147483645`。当时系统提交内存余量不足 1 GiB，后来降至不足 300 MiB；无本项目遗留进程可释放，未终止其他应用。不能把本地构建写成通过，正式包改用云端干净构建。
+- [首次 CI](https://github.com/walcracia/muleditor/actions/runs/45585912740) 的 16 组浏览器通过，既有多格式组合用例在同页第 11 次下载（bom.spdx.yaml 保存）等待事件超时；Rust 与 artifact 因此跳过。推断与 Chromium 连续下载限制有关，恢复方案是把七种格式拆为独立用例、各用新上下文，保留全部保存/导出字节断言及源码界面断言，不加重试或放宽超时；应用源码与发行包不变。
+- 测试恢复分支 `agent/status-download-isolation-20261125` 的收集检查通过，共 23 组；本机专项浏览器尝试退出 `-1073740791`，同期内存不足，未记为通过。当前阶段：待推送该测试修正，让云端执行完整 23 组，核验正式附件后回填下载与下一步。
 
 ## 已完成交接：2026-11-25 状态栏简化与当前格式高亮
 
