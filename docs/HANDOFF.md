@@ -15,11 +15,16 @@
 ## 当前交接：2026-11-25 可关闭工作区与问题面板
 
 - 用户新要求：左侧工作区、底部问题面板可以关闭，并有重新打开入口。关闭只改变显示，保留文档、dirty 状态、编辑历史和诊断计算。
-- 基准：`383f40d`（0.3.0 发布确认），集成分支 `agent/closable-panels-20261125`；组件与浏览器用例在独立工作树开发。目标版本 `0.3.1`，尚未发布；稳定下载仍为下方 0.3.0。
+- 基准：`383f40d`（0.3.0 发布确认），集成分支 `agent/closable-panels-20261125` 已合入并推送 `main`；组件与浏览器用例在独立工作树开发。`v0.3.1` 的发行源提交固定为 `45578ad83b08ff733e0c1a4cfbc6a993da9217ff`；测试夹具后续修正于 `8551a8752307d70f213e3d59e63c1cc0e510787e`，应用源码和发行包不变。本确认仅更新文档，精确提交运行 `git log -1`。
 - 已实现：面板标题右侧 X、顶部与“大纲”同组的“工作区/问题”切换按钮、编辑区自适应与焦点恢复；支持格式/操作状态移到底栏。设计与决策见 design_progress 中 0.3.1 小节。
 - 本轮验证：同一 Windows/Node/Rust 环境，`npm run check`、`npm test` 97 项、`npm run build`、Edge `npm run test:e2e` 15 组（原 13 组与新增 2 组）、版本校验通过；`cargo check --locked -j 1` 和 `cargo test --locked -j 1` 9 项通过，manifest 为 `src-tauri/Cargo.toml`。本轮依赖仅版本号变化，沿用本会话已执行的锁定 `npm ci`。
 - 实测两区独立关闭/重开，编辑宽高实际增加，大纲组合全关不留空列；脏状态、源/沉浸内容保留，问题隐藏时 JSON 诊断继续更新，关闭焦点回顶部按钮。中英文 1040/1600 实际截图已核对：[关闭状态](assets/muleditor-0.3.1-panels-closed.png)、[英文最小窗口](assets/muleditor-0.3.1-panels-en-minimum.png)。保留既有大 chunk 构建提示。
-- 下一步：提交推送、构建新便携版并核对云端 CI/Release 和下载。当前仅完成上述本地验证，0.3.1 尚未发布；原生及下载结果完成后回填。
+- 原生构建：从干净发行源提交执行 `npm.cmd run tauri:build -- --no-sign` 和 `scripts/package-release.ps1` 通过，生成新 EXE、NSIS 和便携 ZIP。本轮不冒充已重复安装器安装或完整原生文件操作验收；交互证据为本轮真实浏览器操作，下载版只核对内容/版本/签名/哈希。
+- 首次[CI](https://github.com/walcracia/muleditor/actions/runs/45575899207) 中 14 组浏览器通过，新增 JSON 用例因模拟键入触发 Monaco 自动补齐而留下多余配对字符，保存原文断言失败。`8551a87` 仅将该非法 JSON 夹具改为不含配对符号的文本，仍完整检查隐藏期间诊断、dirty、保存原文和恢复内容；未弱化断言或改动应用实现，也未移动标签。
+- 修正后的[CI](https://github.com/walcracia/muleditor/actions/runs/45576694266) 成功：锁定安装、97 前端测试、15 组 Chromium 浏览器回归、9 Rust 测试及前端 artifact。`muleditor-web-8551a8752307d70f213e3d59e63c1cc0e510787e` 保留至 2026-12-25 16:33 Asia/Shanghai。发行源与该提交的差异只有上述测试文件。
+- [Windows Release](https://github.com/walcracia/muleditor/actions/runs/45575906971) 成功，正式 [v0.3.1](https://github.com/walcracia/muleditor/releases/tag/v0.3.1) 三个附件已实际下载。ZIP 仅 README.txt 与哞-编辑器.exe，README 源提交匹配；EXE 为 `0.3.1`、`NotSigned`、SHA-256 `82ff2178d8005f9c7dd80a8e5e084fbbb76644a33827f0dc886e2bad698a7e91`。
+- 下载：[便携 ZIP](https://github.com/walcracia/muleditor/releases/download/v0.3.1/MulEditor-0.3.1-windows-x64-portable.zip) SHA-256 `36f13e0e39ddf0e8048ae9bbb5c1828e3fef83ba7483dd2fa3a1874e8764193b`；[安装包](https://github.com/walcracia/muleditor/releases/download/v0.3.1/MulEditor-0.3.1-windows-x64-setup.exe) SHA-256 `46828eb7457d033532b19ec5e90ec2a82b375a189ad94d773a9ffda17ed6c837`，与[校验清单](https://github.com/walcracia/muleditor/releases/download/v0.3.1/SHA256SUMS.txt)一致。
+- 下一步：本轮需求及发布均已完成。新电脑先 `git status --short --branch`，再 fetch；干净工作区 `git pull --ff-only`，首次安装 `npm ci`，按用户下一项需求继续。面板显示选择仅当前运行内保留，既有 Monaco CDN、未签名与会话不持久化等边界不变。
 
 ## 已完成交接：2026-11-25-01 沉浸模式与源代码模式
 
