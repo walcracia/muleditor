@@ -17,9 +17,24 @@ async function selectDocument(page: Page, name: string) {
   await expect(page.locator(".tabs .tab.active .tabName")).toHaveText(name);
 }
 
+function contrastRatio(first: string, second: string) {
+  const luminance = (color: string) => {
+    const channels = color.match(/[\d.]+/g)!.map(Number);
+    expect(channels[3] ?? 1, `Opaque status color: ${color}`).toBe(1);
+    const [red, green, blue] = channels.slice(0, 3).map((channel) => {
+      const value = channel / 255;
+      return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+  };
+  const [bright, dark] = [luminance(first), luminance(second)].sort((a, b) => b - a);
+  return (bright + 0.05) / (dark + 0.05);
+}
+
 async function expectFormat(page: Page, format: string, label: string) {
   const list = page.locator(".statusSupportedFormats");
   await expect(list.getByRole("listitem")).toHaveCount(6);
+  await expect(list.getByRole("listitem")).toHaveText(["MD", "HTML", "XML", "YAML", "JSON", "SPDX"]);
   const current = list.locator(".statusFormat[aria-current='true']");
   await expect(current).toHaveCount(1);
   await expect(current).toHaveAttribute("data-format", format);
@@ -28,6 +43,11 @@ async function expectFormat(page: Page, format: string, label: string) {
   await expect(list.locator(`.statusFormat[aria-current]:not([data-format='${format}'])`)).toHaveCount(0);
   await expect(list.locator(".statusFormat.active")).toHaveCount(1);
   await expect(list.getByRole("button")).toHaveCount(0);
+  const standaloneFormat = page.locator(".statusBar > span:not(.statusFilePath):not(.statusMessage):not(.statusSupportedFormats)")
+    .filter({ hasText: /^(?:Markdown|MD|HTML|XML|YAML|JSON|SPDX(?: JSON| YAML| 标签\/值| Tag\/Value)?)$/ });
+  await expect(standaloneFormat).toHaveCount(0);
+  if (format === "markdown") await expect(current).toHaveAttribute("title", "Markdown");
+  if (format === "spdx") await expect(current).toHaveAttribute("title", /^SPDX (?:JSON|YAML|标签\/值|Tag\/Value)$/);
   await expect(page.locator(".statusBar")).not.toContainText(/Tauri|Browser|浏览器/);
 }
 
@@ -79,9 +99,14 @@ test("current format stays distinct and visible in both languages and desktop si
         const active = list.querySelector("[aria-current='true']")!;
         const inactive = list.querySelector(".statusFormat:not([aria-current])")!;
         return { active: getComputedStyle(active).backgroundColor, inactive: getComputedStyle(inactive).backgroundColor,
+          foreground: getComputedStyle(active).color, bar: getComputedStyle(list.closest(".statusBar")!).backgroundColor,
+          inactiveForeground: getComputedStyle(inactive).color,
           weight: Number(getComputedStyle(active).fontWeight) };
       });
       expect(colors.active).not.toBe(colors.inactive);
+      expect(colors.foreground).not.toBe(colors.inactiveForeground);
+      expect(contrastRatio(colors.active, colors.bar)).toBeGreaterThanOrEqual(7);
+      expect(contrastRatio(colors.foreground, colors.active)).toBeGreaterThanOrEqual(4.5);
       expect(colors.weight).toBeGreaterThanOrEqual(700);
       if (document.format === "json") {
         await expect(page.locator(".monaco-editor:visible .view-lines").first()).toContainText("format-status");
