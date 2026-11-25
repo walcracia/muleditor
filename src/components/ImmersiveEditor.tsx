@@ -167,6 +167,10 @@ export function ImmersiveEditor(props: ImmersiveEditorProps) {
         "Mod-b": toggleMark(schema.marks.strong), "Mod-i": toggleMark(schema.marks.em),
         "Mod-Shift-x": toggleMark(schema.marks.strike), "Mod-`": toggleMark(schema.marks.code),
         "Mod-k": () => { open("link"); return true; },
+        Home: moveLineBoundary(-1, false), "Shift-Home": moveLineBoundary(-1, true),
+        End: moveLineBoundary(1, false), "Shift-End": moveLineBoundary(1, true),
+        "Mod-Home": moveDocumentBoundary(-1, false), "Mod-Shift-Home": moveDocumentBoundary(-1, true),
+        "Mod-End": moveDocumentBoundary(1, false), "Mod-Shift-End": moveDocumentBoundary(1, true),
         "Mod-Enter": exitCode,
         Backspace: undoInputRule,
         Enter: chainCommands(fenceOnEnter, continueList, baseKeymap.Enter),
@@ -392,7 +396,8 @@ export function ImmersiveEditor(props: ImmersiveEditorProps) {
         else node = existing!.type.create({ ...existing!.attrs, source: form.source });
         transaction = position != null ? transaction.replaceWith(position, position + existing!.nodeSize, node) : transaction.replaceSelectionWith(node);
         if (form.kind === "footnote" && position == null) {
-          const definition = schema.nodes.raw_block.create({ source: `[^${form.label.trim() || "note"}]: ${form.source || (props.locale === "zh" ? "脚注内容" : "Footnote text")}`, kind: "definitions" });
+          const body = (form.source || (props.locale === "zh" ? "脚注内容" : "Footnote text")).replace(/\r\n?/g, "\n").replace(/\n/g, "\n    ");
+          const definition = schema.nodes.raw_block.create({ source: `[^${form.label.trim()}]: ${body}`, kind: "definitions" });
           transaction = transaction.insert(transaction.doc.content.size, definition);
         }
       }
@@ -564,6 +569,39 @@ function nativeSelectionIsCurrent(view: EditorView): boolean {
     return view.posAtDOM(selection.anchorNode, selection.anchorOffset) === view.state.selection.anchor &&
       view.posAtDOM(selection.focusNode, selection.focusOffset) === view.state.selection.head;
   } catch { return false; }
+}
+
+// Commit Home/End movement immediately. Otherwise the view's recent-focus
+// recovery can mistake a fast native Home for a browser caret reset before
+// selectionchange reaches the document state (for example Home → Shift+End).
+function moveLineBoundary(side: -1 | 1, extend: boolean): Command {
+  return (state, dispatch, view) => {
+    if (!(state.selection instanceof TextSelection) || !view) return false;
+    let anchor = extend ? state.selection.anchor : side < 0 ? state.selection.$head.start() : state.selection.$head.end();
+    let head = side < 0 ? state.selection.$head.start() : state.selection.$head.end();
+    const native = view.dom.ownerDocument.getSelection();
+    if (native && typeof native.modify === "function") {
+      try {
+        native.modify(extend ? "extend" : "move", side < 0 ? "backward" : "forward", "lineboundary");
+        if (native.anchorNode && native.focusNode) {
+          anchor = view.posAtDOM(native.anchorNode, native.anchorOffset);
+          head = view.posAtDOM(native.focusNode, native.focusOffset);
+        }
+      } catch { /* Use textblock boundaries on browsers without a mapped DOM range. */ }
+    }
+    if (dispatch) dispatch(state.tr.setSelection(TextSelection.create(state.doc, anchor, head)).scrollIntoView());
+    return true;
+  };
+}
+
+function moveDocumentBoundary(side: -1 | 1, extend: boolean): Command {
+  return (state, dispatch) => {
+    const target = TextSelection.findFrom(state.doc.resolve(side < 0 ? 0 : state.doc.content.size), side < 0 ? 1 : -1, true);
+    if (!target) return false;
+    const boundary = target.head;
+    if (dispatch) dispatch(state.tr.setSelection(TextSelection.create(state.doc, extend ? state.selection.anchor : boundary, boundary)).scrollIntoView());
+    return true;
+  };
 }
 
 /** One complete document render shared by all reference/definition node views. */

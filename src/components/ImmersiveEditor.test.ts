@@ -15,6 +15,8 @@ beforeEach(() => {
   document.body.append(container);
   root = createRoot(container);
   Element.prototype.scrollIntoView = vi.fn();
+  Object.defineProperty(Range.prototype, "getClientRects", { configurable: true, value: () => [] });
+  Object.defineProperty(Range.prototype, "getBoundingClientRect", { configurable: true, value: () => new DOMRect() });
 });
 
 afterEach(async () => {
@@ -119,5 +121,37 @@ describe("immersive reference node views", () => {
     expect(editor.lastElementChild?.tagName).toBe("P");
     expect(editor.lastElementChild?.textContent).toBe("");
     expect(value.onChange).toHaveBeenLastCalledWith("$$\nx^2 + y^2 = z^2\n$$");
+  });
+
+  it("keeps all lines entered in a new footnote inside its definition", async () => {
+    const value = props("Text.\n");
+    await render({ ...value, command: { id: 1, action: "md-footnote" } });
+    const textarea = container.querySelector<HTMLTextAreaElement>("textarea")!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(textarea, "First line.\n\nSecond paragraph.");
+      textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => container.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+    const calls = vi.mocked(value.onChange).mock.calls;
+    const source = calls[calls.length - 1][0];
+    expect(source).toContain(": First line.\n    \n    Second paragraph.");
+    await vi.waitFor(() => expect(container.querySelector(".footnote-item")?.textContent).toContain("Second paragraph."));
+  });
+
+  it("commits rapid Home then Shift+End movement before formatting the selected text", async () => {
+    const value = props("Text.\n");
+    await render(value);
+    const editor = container.querySelector<HTMLElement>(".immersiveDocument")!;
+    await act(async () => {
+      editor.focus();
+      const text = editor.querySelector("p")!.firstChild!;
+      document.getSelection()!.collapse(text, text.textContent!.length);
+      document.dispatchEvent(new Event("selectionchange"));
+      editor.dispatchEvent(new KeyboardEvent("keydown", { key: "Home", bubbles: true, cancelable: true }));
+      editor.dispatchEvent(new KeyboardEvent("keydown", { key: "End", shiftKey: true, bubbles: true, cancelable: true }));
+    });
+    expect(document.getSelection()?.toString()).toBe("Text.");
+    await render({ ...value, command: { id: 2, action: "md-bold" } });
+    expect(value.onChange).toHaveBeenLastCalledWith("**Text.**\n");
   });
 });
