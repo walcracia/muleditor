@@ -15,14 +15,17 @@
 ## 当前交接：2026-11-25 格式指示去重与强化高亮
 
 - 用户反馈：当前格式高亮不明显，独立 Markdown 文案重复；以用户红框指向的状态栏独立类型文字为删除对象。
-- 基准 `674f15b`，工作分支 `agent/status-contrast-20261125`，目标 0.3.3。移除已支持类型的独立文字；右侧当前项采用高对比亮色底/深字、加粗与更大留白，悬停保留具体类型信息。未知文本仍可回退提示。
+- 基准 `674f15b`，实现分支 `agent/status-contrast-20261125` 与测试恢复分支均已合入并推送 `main`，版本 0.3.3。移除已支持类型的独立文字；右侧当前项采用高对比亮色底/深字、加粗与更大留白，悬停保留具体类型信息。未知文本仍可回退提示。
 - 实现入口：`src/components/StatusBar.tsx`、`src/styles.css`；格式仍直接派生 `DocumentTab.format`，不引入额外状态。回归位于 `tests/status-format.spec.ts`，保留原有两组并增加单一指示、悬停具体类型及实际颜色对比断言。
 - 本轮 Windows x64、Node 22.14.0/npm 10.9.2、Rust 1.99.1：`npm run check`、`npm run build`、97 项前端测试、版本校验通过；`cargo check` / `cargo test`（`--manifest-path src-tauri/Cargo.toml --locked -j 1`）9 项通过。依赖仅项目版本变化，沿用本会话已完成的 `npm ci`；云端重新锁定安装。
 - 原有 17 组 Edge 浏览器回归通过，增强断言后的 2 组格式专项再次通过。实测六类/三个 SPDX 变体切换，保存原文和 dirty 不变；当前底色与状态栏对比至少 7:1，文字与底色至少 4.5:1，中英文 1600/1040 均可见。截图：[MD/中文](assets/muleditor-0.3.3-format-zh.png)、[JSON/英文最小窗口](assets/muleditor-0.3.3-format-en-minimum.png)。保留既有大 chunk 构建提示。
-- 发行源 `c8ab7120ee49314a6beb35e4db21695cdf57ecc1` 已推送 main 并创建新标签 v0.3.3。[Windows Release](https://github.com/walcracia/muleditor/actions/runs/45585922801) 成功，实际下载与校验待核对；已发布标签和附件不移动、不替换。
+- 发行源 `c8ab7120ee49314a6beb35e4db21695cdf57ecc1` 对应标签 v0.3.3。[Windows Release](https://github.com/walcracia/muleditor/actions/runs/45585922801) 的锁定安装、前端验证、Rust 测试、原生构建和标准打包成功；[正式 Release](https://github.com/walcracia/muleditor/releases/tag/v0.3.3) 已公开。已发布标签和附件不移动、不替换。
+- 三个正式附件均已实际下载。便携 ZIP 仅含 `README.txt`、`哞-编辑器.exe`，README 源提交匹配；EXE 版本 `0.3.3`、`NotSigned`、SHA-256 `46a0fcca2f62147da4ac3a3517166e7c36494395f0fed83d89eb9e5599a1a84b`。本轮未启动下载版或安装器；不能把浏览器检查或构建成功冒充完整原生 UI 验证。
+- 下载：[便携 ZIP](https://github.com/walcracia/muleditor/releases/download/v0.3.3/MulEditor-0.3.3-windows-x64-portable.zip) SHA-256 `1e41f6adaa19500f913a7e42ed55e0634084af8136bfb662bff6d39ff5b7b30c`；[安装包](https://github.com/walcracia/muleditor/releases/download/v0.3.3/MulEditor-0.3.3-windows-x64-setup.exe) SHA-256 `5ff60448aaa7cb9b453c1d6efb9f69414624b5d2ced09922e21d1158811630f3`，均与[校验清单](https://github.com/walcracia/muleditor/releases/download/v0.3.3/SHA256SUMS.txt)匹配。
 - 本机原生构建两次未完成：首次前端预构建退出 `-1073741819`；限制 Node 堆至 768 MiB 后明确报 `Fatal process out of memory: Zone`，退出 `-2147483645`。当时系统提交内存余量不足 1 GiB，后来降至不足 300 MiB；无本项目遗留进程可释放，未终止其他应用。不能把本地构建写成通过，正式包改用云端干净构建。
 - [首次 CI](https://github.com/walcracia/muleditor/actions/runs/45585912740) 的 16 组浏览器通过，既有多格式组合用例在同页第 11 次下载（bom.spdx.yaml 保存）等待事件超时；Rust 与 artifact 因此跳过。推断与 Chromium 连续下载限制有关，恢复方案是把七种格式拆为独立用例、各用新上下文，保留全部保存/导出字节断言及源码界面断言，不加重试或放宽超时；应用源码与发行包不变。
-- 测试恢复分支 `agent/status-download-isolation-20261125` 的收集检查通过，共 23 组；本机专项浏览器尝试退出 `-1073740791`，同期内存不足，未记为通过。当前阶段：待推送该测试修正，让云端执行完整 23 组，核验正式附件后回填下载与下一步。
+- 测试恢复提交 `128ac22e51e37488848ee6fc97d469154d61a1ca` 的收集检查通过，共 23 组；本机专项浏览器尝试退出 `-1073740791`，同期内存不足，未记为通过。该提交与发行源的差异只有测试及文档，应用、依赖和打包脚本一致。[恢复 CI](https://github.com/walcracia/muleditor/actions/runs/45591535752) 最终成功：重新锁定安装、类型/版本/构建检查、97 项前端测试、23 组 Chromium 浏览器回归（38.4 秒）、9 项 Rust 测试全部通过。前端 artifact `muleditor-web-128ac22e51e37488848ee6fc97d469154d61a1ca` 已实际下载，含 index.html 和 123 个 assets；保留至 2026-12-25 18:09 Asia/Shanghai。
+- 下一步：本轮需求与发布均已完成，无阻塞。包含本交接的提交仅确认文档，运行 `git log -1` 查询；不移动发行标签。新电脑先检查 `git status --short --branch`、fetch，干净工作区 `git pull --ff-only`，首次执行 `npm ci`，按用户下一项需求继续。需本机重新构建时先确保足够系统内存，再执行发布文档中的标准命令；既有 CDN、未签名与会话不持久化边界仍保留。
 
 ## 已完成交接：2026-11-25 状态栏简化与当前格式高亮
 
