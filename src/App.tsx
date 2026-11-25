@@ -78,7 +78,6 @@ export function App() {
   const folderInputRef = useRef<HTMLInputElement>(null);
   const startupFilesLoadedRef = useRef(false);
   const dragDepthRef = useRef(0);
-  const runtime = isTauriRuntime() ? "Tauri" : "Browser";
 
   const activeTab = tabs.find((tab) => tab.id === activeId) ?? tabs[0];
   const baseAnalyses = useMemo(
@@ -737,7 +736,7 @@ export function App() {
 
       {showProblems ? <ProblemsPanel diagnosticsByTab={analyses.map(({ tab, analysis }) => ({ tab, diagnostics: analysis.diagnostics }))} locale={locale}
         onClose={() => { setShowProblems(false); problemsToggleRef.current?.focus(); }} /> : null}
-      <StatusBar tab={activeTab} issueCount={activeAnalysis.diagnostics.length} runtime={runtime} locale={locale} status={status} />
+      <StatusBar tab={activeTab} issueCount={activeAnalysis.diagnostics.length} locale={locale} status={status} />
       <input id="fileInput" ref={fileInputRef} className="hiddenInput" type="file" multiple onChange={handleBrowserFile} />
       <input id="folderInput" ref={folderInputRef} className="hiddenInput" type="file" multiple onChange={handleBrowserFolder} />
     </div>

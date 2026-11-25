@@ -5,13 +5,22 @@ import { formatLabel, text } from "../lib/i18n";
 interface StatusBarProps {
   tab: DocumentTab;
   issueCount: number;
-  runtime: string;
   locale: Locale;
   status: string;
 }
 
-export function StatusBar({ tab, issueCount, runtime, locale, status }: StatusBarProps) {
+const statusFormats = [
+  { format: "markdown", label: "MD" },
+  { format: "html", label: "HTML" },
+  { format: "xml", label: "XML" },
+  { format: "yaml", label: "YAML" },
+  { format: "json", label: "JSON" },
+  { format: "spdx", label: "SPDX" }
+] as const;
+
+export function StatusBar({ tab, issueCount, locale, status }: StatusBarProps) {
   const lineCount = tab.content.split(/\r?\n/).length;
+  const activeFormat = tab.format.startsWith("spdx-") ? "spdx" : tab.format;
   return (
     <div className="statusBar">
       <span className="statusFilePath" title={tab.path || tab.name}>{tab.path || tab.name}</span>
@@ -22,9 +31,14 @@ export function StatusBar({ tab, issueCount, runtime, locale, status }: StatusBa
         {lineCount} {text(locale, "common.lines")}
       </span>
       <span>{issueCount ? `${issueCount} ${text(locale, "common.issues")}` : text(locale, "common.clean")}</span>
-      <span>{runtime === "Tauri" ? text(locale, "common.tauri") : text(locale, "common.browser")}</span>
-      <span className="statusSupportedFormats" aria-label={text(locale, "toolbar.supportedFormats")} title={text(locale, "toolbar.supportedFormats")}>
-        MD · HTML · XML · YAML · JSON · SPDX
+      <span className="statusSupportedFormats" role="list" aria-label={text(locale, "toolbar.supportedFormats")} title={text(locale, "toolbar.supportedFormats")}>
+        {statusFormats.map(({ format, label }) => (
+          <span key={format} role="listitem" data-format={format}
+            className={activeFormat === format ? "statusFormat active" : "statusFormat"}
+            aria-current={activeFormat === format ? "true" : undefined}>
+            {label}
+          </span>
+        ))}
       </span>
     </div>
   );

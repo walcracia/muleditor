@@ -1112,8 +1112,27 @@ button.outlineItem:focus-visible {
 }
 
 .statusBar .statusSupportedFormats {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   flex: 0 0 auto;
   color: #c0d3e8;
+}
+
+.statusBar .statusFormat {
+  display: inline-flex;
+  align-items: center;
+  height: 19px;
+  padding: 0 4px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+}
+
+.statusBar .statusFormat.active {
+  border-color: #81acd9;
+  background: #315b8a;
+  color: #fff;
+  font-weight: 700;
 }
 
 .hiddenInput {

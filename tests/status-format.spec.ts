@@ -83,6 +83,9 @@ test("current format stays distinct and visible in both languages and desktop si
       });
       expect(colors.active).not.toBe(colors.inactive);
       expect(colors.weight).toBeGreaterThanOrEqual(700);
+      if (document.format === "json") {
+        await expect(page.locator(".monaco-editor:visible .view-lines").first()).toContainText("format-status");
+      }
       await page.screenshot({ path: testInfo.outputPath(`status-format-${locale}-${width}.png`) });
     }
   }
