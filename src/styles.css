@@ -144,6 +144,11 @@ button {
   color: #174fa7;
 }
 
+.toolbarGroup button:focus-visible {
+  outline: 2px solid #2368d8;
+  outline-offset: -2px;
+}
+
 .newFileMenu {
   position: absolute;
   top: calc(100% + 7px);
