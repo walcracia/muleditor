@@ -1,0 +1,107 @@
+.immersiveEditorShell {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: auto;
+  background: #fbfcfd;
+  scrollbar-color: #a6b4c4 #edf1f5;
+}
+.immersiveEditorMount { min-height: 100%; }
+.immersiveDocument {
+  position: relative;
+  box-sizing: border-box;
+  min-height: 100%;
+  max-width: 84ch;
+  margin-inline: auto;
+  padding: 28px 42px 100px;
+  outline: none;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  caret-color: #155cb3;
+}
+.immersiveDocument:focus-visible { outline: none; }
+.immersiveDocument p { min-height: 1.65em; }
+.immersiveDocument a { cursor: text; }
+.immersiveDocument .ProseMirror-selectednode { outline: 2px solid #2563b0; outline-offset: 3px; }
+.immersiveDocument .ProseMirror-gapcursor { display: none; pointer-events: none; position: absolute; }
+.immersiveDocument.ProseMirror-focused .ProseMirror-gapcursor { display: block; }
+.immersiveDocument .ProseMirror-gapcursor:after { content: ""; display: block; position: absolute; width: 20px; border-block-start: 1px solid #155cb3; animation: immersiveCaret 1s steps(2, start) infinite; }
+.immersiveDocument .ProseMirror-hideselection ::selection { background: transparent; }
+.immersiveDocument .ProseMirror-hideselection { caret-color: transparent; }
+.immersiveDocument .ProseMirror-trailingBreak { pointer-events: none; }
+.immersiveDocument table { table-layout: fixed; width: 100%; display: table; overflow: visible; }
+.immersiveDocument .tableWrapper { max-width: 100%; overflow-x: auto; margin-block: 1em; }
+.immersiveDocument td,
+.immersiveDocument th { min-width: 75px; position: relative; vertical-align: top; }
+.immersiveDocument td > :last-child,
+.immersiveDocument th > :last-child { margin-block-end: 0; }
+.immersiveDocument .selectedCell:after { content: ""; position: absolute; inset: 0; background: #c9dff970; pointer-events: none; }
+.immersiveDocument .column-resize-handle { position: absolute; inset-block: 0; inset-inline-end: -2px; width: 4px; background: #2563b0; pointer-events: none; }
+.immersiveDocument.resize-cursor { cursor: col-resize; }
+.immersiveDocument li > input[hidden] { display: none; }
+.immersiveDocument li > div { min-width: 0; }
+.immersiveDocument .immersiveTaskItem { list-style: none; position: relative; }
+.immersiveDocument .immersiveTaskItem > input { position: absolute; inset-inline-start: -1.5em; inset-block-start: 0.4em; margin: 0; accent-color: #2563b0; cursor: pointer; }
+.immersiveDocument .immersiveTaskItem > input:focus-visible { outline: 2px solid #2563b0; outline-offset: 3px; }
+.immersiveNodeView { position: relative; }
+div.immersiveNodeView { margin-block: 1em; }
+span.immersiveNodeView { display: inline; vertical-align: baseline; }
+.immersiveNodePreview { min-width: 0; }
+.immersiveNodePreview > :first-child { margin-block-start: 0; }
+.immersiveNodePreview > :last-child { margin-block-end: 0; }
+.immersiveNode-raw_block { padding: 10px 12px; border: 1px solid #d2dbe6; border-radius: 4px; background: #f5f7fa; }
+.immersiveNode-raw_block .footnotes { margin: 0; padding: 0; border: 0; }
+.immersiveNode-raw_inline .immersiveNodePreview { border-block-end: 1px dotted #8798ac; }
+.immersiveNodeError { color: #991b1b; }
+.immersiveNodeEdit {
+  position: relative;
+  margin-inline-start: 6px;
+  padding: 2px 6px;
+  border: 1px solid #c7d2e1;
+  border-radius: 3px;
+  color: #365571;
+  background: #f7faff;
+  font: 12px/1.4 "Segoe UI", "Microsoft YaHei", sans-serif;
+  vertical-align: middle;
+  cursor: pointer;
+}
+.immersiveNodeEdit:hover { background: #e7f0fc; border-color: #8aa9cc; }
+.immersiveNodeEdit:focus-visible,
+.immersiveInsertForm :is(input, textarea, button):focus-visible,
+.immersiveTableTools button:focus-visible { outline: 2px solid #2563b0; outline-offset: 2px; }
+.immersiveNodeView:not(:hover):not(.ProseMirror-selectednode) .immersiveNodeEdit:not(:focus-visible) { opacity: 0.3; }
+.immersiveInsertForm {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 3;
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 12px 20px;
+  border-block-end: 1px solid #bdcadb;
+  background: #f2f6fc;
+  color: #243449;
+  font-size: 13px;
+}
+.immersiveInsertForm label { display: grid; gap: 4px; min-width: 0; }
+.immersiveInsertForm input,
+.immersiveInsertForm textarea { box-sizing: border-box; min-width: 0; width: 100%; border: 1px solid #b6c5d8; border-radius: 3px; padding: 7px 8px; color: #1e293b; background: #fff; font: 14px/1.45 "Segoe UI", "Microsoft YaHei", sans-serif; }
+.immersiveInsertForm textarea { resize: vertical; max-height: 240px; font-family: "Cascadia Code", Consolas, monospace; }
+.immersiveFormActions { display: flex; gap: 8px; }
+.immersiveFormActions button,
+.immersiveTableTools button { padding: 5px 10px; border: 1px solid #b6c5d8; border-radius: 3px; color: #243f5d; background: #fff; cursor: pointer; font: inherit; }
+.immersiveFormActions button:hover,
+.immersiveTableTools button:hover { background: #e4eefb; }
+.immersiveFormActions button[type=submit] { color: #fff; border-color: #155cb3; background: #155cb3; }
+.immersiveError { margin: 0; padding: 10px 20px; background: #fff2f2; color: #991b1b; font-size: 13px; }
+.immersiveTableTools { position: sticky; inset-block-start: 0; z-index: 2; display: flex; flex-wrap: wrap; gap: 6px; padding: 7px 18px; border-block-end: 1px solid #d2dbe6; background: #f1f5fa; font-size: 12px; }
+@keyframes immersiveCaret { to { visibility: hidden; } }
+@media (max-width: 1150px) { .immersiveDocument { padding-inline: 26px; } }
+@media (prefers-reduced-motion: reduce) { .immersiveDocument .ProseMirror-gapcursor:after { animation: none; } }
+@media (forced-colors: active) {
+  .immersiveDocument .selectedCell:after { outline: 1px solid Highlight; background: transparent; }
+  .immersiveNodeEdit,
+  .immersiveInsertForm,
+  .immersiveTableTools { border-color: CanvasText; }
+}
