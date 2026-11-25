@@ -8,7 +8,7 @@ async function bounds(locator: Locator) {
 }
 
 function panelToggle(page: Page, panel: "workspacePanel" | "problemsPanel") {
-  return page.locator(`.statusBar button[aria-controls='${panel}']`);
+  return page.locator(`.toolbar button[aria-controls='${panel}']`);
 }
 
 async function expectInsideViewport(page: Page, locator: Locator) {
@@ -31,6 +31,11 @@ test("closing panels gives space to the editor without losing content or hiding 
   await expect(problems).toBeVisible();
   await expect(workspaceToggle).toHaveAttribute("aria-expanded", "true");
   await expect(problemsToggle).toHaveAttribute("aria-expanded", "true");
+  await expect(page.locator(".toolbar .formatRail, .toolbar .toolbarStatus")).toHaveCount(0);
+  await expect(page.locator(".statusBar .statusMessage")).toContainText("就绪");
+  const supportedFormats = page.locator(".statusBar .statusSupportedFormats");
+  await expect(supportedFormats).toBeVisible();
+  for (const format of ["MD", "HTML", "XML", "YAML", "JSON", "SPDX"]) await expect(supportedFormats).toContainText(format);
   await page.locator("#fileInput").setInputFiles([
     { name: "notes.md", mimeType: "text/markdown", buffer: Buffer.from("# 面板布局\n\n保留正文。\n") },
     { name: "data.json", mimeType: "application/json", buffer: Buffer.from('{"ready":true}\n') }
@@ -116,6 +121,9 @@ test("panel close and reopen controls remain available in both languages and des
       await expect(problemsToggle).toHaveAttribute("aria-label", locale === "zh" ? /问题/ : /problems/i);
       await expectInsideViewport(page, workspaceToggle);
       await expectInsideViewport(page, problemsToggle);
+      await expect(page.locator(".toolbar .formatRail, .toolbar .toolbarStatus")).toHaveCount(0);
+      await expectInsideViewport(page, page.locator(".statusBar .statusMessage"));
+      await expectInsideViewport(page, page.locator(".statusBar .statusSupportedFormats"));
       const original = await bounds(page.locator(".editorRegion"));
       await page.screenshot({ path: testInfo.outputPath(`panels-${locale}-${width}-open.png`) });
       await workspace.getByRole("button", { name: locale === "zh" ? "关闭工作区" : /close workspace/i }).click();
