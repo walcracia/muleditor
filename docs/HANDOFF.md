@@ -15,12 +15,16 @@
 ## 当前交接：2026-11-25-01 沉浸模式与源代码模式
 
 - 授权范围：Markdown 的编辑/预览改为均可直接编辑的沉浸模式与源代码模式；HTML 保持源码及预览，XML/YAML/JSON/SPDX 保持源码及结构视图。保留 React、Monaco、多格式架构及统一 Markdown 导出管线。
-- 基准：`b3a7d776729b5ad95c9baf6c7468520aaf0479f4`；集成分支 `agent/immersive-20261125`，模型、组件、浏览器回归在三个独立 worktree 开发，目标版本 `0.3.0`。
+- 基准：`b3a7d776729b5ad95c9baf6c7468520aaf0479f4`；集成分支 `agent/immersive-20261125` 已合入 `main` 并推送；发布 `v0.3.0` 的源提交固定为 `14d3be6be1563f243c3093f697c56801a486c6e8`。包含本确认的后续提交只更新文档，可运行 `git log -1` 查询。
 - 已实现：ProseMirror 可视编辑、源块保真、语义工具栏、模式同步和特殊节点编辑；Markdown 默认沉浸，两种模式都可编辑。普通标题/列表/引用/任务/表格直接操作；公式/图表/图片有表单；脚注编辑对应定义。仅切换不改源文、不置 dirty。
 - 验收重点：无编辑切换不改字节、不置 dirty；局部修改不丢 Front Matter、脚注、图表及原始 HTML；源码与沉浸内容同步；另存和离线 HTML 导出保留公式、图表、图片与样式。
 - 当前验证：Windows x64、Node 22.14.0/npm 10.9.2、Rust 1.99.1；`npm ci`、版本校验、`npm run check`、`npm run build`、97 个前端测试通过。Edge 的最终 `npm run test:e2e` 13 组全部通过，覆盖实际下载 HTML 离线公式/字体/图表/图片及净化、模式同步、真实选区、工具栏、列表、任务、表格、撤销/重做和迟到 Monaco 加载；额外快速 Home/Shift+End 连续 8 次通过。`cargo check --locked` 通过；Rust test 首次内存分配失败，串行 `cargo test --locked -j 1` 后 9 项通过。Cargo manifest 均为 `src-tauri/Cargo.toml`。
-- 视觉证据：本轮实际生产构建的[中文 1600px](assets/muleditor-0.3.0-immersive-zh.png)、[英文 1040px](assets/muleditor-0.3.0-immersive-en-minimum.png)；两种语言 1040/1600 均检查，窄窗口工具栏横向滚动，模式和右侧大纲不裁切。原生/发布证据将在完成后回填。
-- 下一步：桌面构建，然后推送并发布可下载的新版本。当前稳定下载仍为下方 `v0.2.0`，`0.3.0` 尚未发布。
+- 视觉证据：本轮实际生产构建的[中文 1600px](assets/muleditor-0.3.0-immersive-zh.png)、[英文 1040px](assets/muleditor-0.3.0-immersive-en-minimum.png)；两种语言 1040/1600 均检查，窄窗口工具栏横向滚动，模式和右侧大纲不裁切。
+- 原生：`npm.cmd run tauri:build -- --no-sign`、`scripts/package-release.ps1` 通过，生成 EXE/NSIS/便携 ZIP；本机自编同源 EXE 启动成功，原生 WebView2 显示默认沉浸模式、源码入口和工作台，打开文件对话框可显示。完整安装器安装及全原生文件编辑/保存流程未逐项重测。下载版仅检查包内容、哈希、版本与签名，不把自编启动冒充下载版启动。
+- 云端 [CI](https://github.com/walcracia/muleditor/actions/runs/45571804007) 成功：97 前端测试、13 组 Chromium 浏览器回归、9 Rust 测试。前端 artifact 已实际下载，含 index.html 和 123 个 assets；保留至 2026-12-25 15:58 Asia/Shanghai。
+- [Windows Release](https://github.com/walcracia/muleditor/actions/runs/45572106053) 成功，`v0.3.0` 已公开发布，三个附件均实际下载；ZIP 只有 README.txt 与哞-编辑器.exe，README 的源提交匹配。下载 EXE 版本 `0.3.0`、`NotSigned`、SHA-256 `5ee2296890a9b2f2e5ad5e6e406c01ee4d07cecd6c51233814eef8b14010af0e`。
+- 下载：[便携 ZIP](https://github.com/walcracia/muleditor/releases/download/v0.3.0/MulEditor-0.3.0-windows-x64-portable.zip) SHA-256 `0f7cc6896daf89b6a26e8f84a1342d5452f8ba4dd154d69d915a4fa4e022c901`；[安装包](https://github.com/walcracia/muleditor/releases/download/v0.3.0/MulEditor-0.3.0-windows-x64-setup.exe) SHA-256 `b941ad28e7d269ba3d87e1cbd48a4cf61eac3d16ebad03dfbcfab38da261ccb1`，均与[清单](https://github.com/walcracia/muleditor/releases/download/v0.3.0/SHA256SUMS.txt)匹配。
+- 下一步：沉浸编辑迭代和发布已完成。先检查 Git 状态、fetch/pull 最新 main，再按用户后续需求迭代；当前稳定下载为 [v0.3.0](https://github.com/walcracia/muleditor/releases/tag/v0.3.0)。
 - 保真边界：只规范化真实修改的顶层块；复杂 HTML/未知语法保留原文节点；源码变更/格式化会重建相应沉浸撤销历史。GFM 表格不提供合并单元格或持久列宽。跨标签切换保留内容与已有模式；跨非 Markdown 标签保留沉浸历史。
 - 模块入口：`src/components/ImmersiveEditor.tsx`、`src/lib/immersiveMarkdown.ts`、`src/immersive.css`；模式/文档生命周期仍在 `src/App.tsx`，Monaco 在 `EditorPane.tsx`；预览/特殊节点及 HTML 导出仍共用 `src/lib/markdown.ts`。
 

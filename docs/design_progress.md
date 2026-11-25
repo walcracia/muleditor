@@ -282,6 +282,8 @@ Known implementation boundary:
 
 版本 `0.3.0`。本轮已执行 `npm ci`、版本校验、类型检查、前端构建和 97 个前端测试；最终 Edge 浏览器回归 13 组全部通过，真实下载的 HTML 离线保留公式/字体/图表/图片与样式，净化、选区工具栏、上下文结构和源码同步均检查。快速 Home/Shift+End 连续 8 次通过；中英文 1040/1600 实际截图核查通过，证据见 `HANDOFF.md`。Rust check 通过；test 首次在本机内存紧张时分配失败，改用 `-j 1` 后 9 项全部通过，未改动 Rust 业务代码。构建仍有既有大 chunk 提示。桌面/发布状态以交接中的本轮记录为准。
 
+发布确认：源提交 `14d3be6be1563f243c3093f697c56801a486c6e8` 的 CI 与 Windows Release 均成功，[v0.3.0](https://github.com/walcracia/muleditor/releases/tag/v0.3.0) 三个附件已实际下载并核对哈希、版本、签名与源提交；本地同源 EXE 启动通过。详细证据和边界见 HANDOFF，本确认不移动标签或替换资产。
+
 ### 2026-11-20 Markdown 统一渲染与自包含导出
 
 - 保留 React、Monaco、多格式工作台、原生文件操作和只读 Diff；Markdown 语法层切到 markdown-it，接入 KaTeX、代码高亮、脚注和稳定的标题锚点。
