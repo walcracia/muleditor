@@ -409,11 +409,11 @@ export function ImmersiveEditor(props: ImmersiveEditorProps) {
     }}>
       <strong>{`${form.position == null ? words.insert : words.edit} ${words[form.kind]}`}</strong>
       {["link", "image"].includes(form.kind) ? <>
-        <label>{`${words[form.kind]}${words.address}`}<input value={form.href} onChange={(event) => setForm({ ...form, href: event.target.value })} required={form.kind === "image"} /></label>
+        <label>{`${words[form.kind]}${props.locale === "en" ? " " : ""}${words.address}`}<input value={form.href} onChange={(event) => setForm({ ...form, href: event.target.value })} required={form.kind === "image"} /></label>
         <label>{words.label}<input value={form.label} onChange={(event) => setForm({ ...form, label: event.target.value })} /></label>
       </> : <>
         {form.kind === "footnote" ? <label>{props.locale === "zh" ? "脚注标识" : "Footnote label"}<input value={form.label} onChange={(event) => setForm({ ...form, label: event.target.value })} required /></label> : null}
-        <label>{`${words[form.kind]}${words.source}`}<textarea value={form.source} rows={form.kind === "emoji" ? 1 : 4} onChange={(event) => setForm({ ...form, source: event.target.value })} /></label>
+        <label>{`${words[form.kind]}${props.locale === "en" ? " " : ""}${words.source}`}<textarea value={form.source} rows={form.kind === "emoji" ? 1 : 4} onChange={(event) => setForm({ ...form, source: event.target.value })} /></label>
       </>}
       <div className="immersiveFormActions"><button type="submit">{words.apply}</button><button type="button" onClick={() => { setForm(undefined); viewRef.current?.focus(); }}>{words.cancel}</button></div>
     </form> : null}
