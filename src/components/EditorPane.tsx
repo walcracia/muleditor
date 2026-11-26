@@ -1,7 +1,7 @@
-import { useEffect, useRef } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import Editor, { DiffEditor } from "@monaco-editor/react";
 import type { editor as MonacoEditor } from "monaco-editor";
-import type { DocumentTab, EditorCommand } from "../types";
+import type { DocumentTab, EditorCommand, EditorPositionHandle } from "../types";
 import { getMonacoLanguage } from "../lib/formats";
 import type { Locale } from "../lib/i18n";
 import { text } from "../lib/i18n";
@@ -18,12 +18,22 @@ interface EditorPaneProps {
   onDiffSourceChange: (tabId?: string) => void;
 }
 
-export function EditorPane({ tab, tabs, showDiff, diffSourceId, locale, active = true, command, onChange, onDiffSourceChange }: EditorPaneProps) {
+export const EditorPane = forwardRef<EditorPositionHandle, EditorPaneProps>(function EditorPane({ tab, tabs, showDiff, diffSourceId, locale, active = true, command, onChange, onDiffSourceChange }, ref) {
   const editorRef = useRef<MonacoEditor.IStandaloneCodeEditor | null>(null);
   const diffModelsRef = useRef<MonacoEditor.IDiffEditorModel | null>(null);
   const appliedCommandRef = useRef<number>();
   const latestPropsRef = useRef({ active, tabId: tab.id, command, showDiff });
   latestPropsRef.current = { active, tabId: tab.id, command, showDiff };
+
+  useImperativeHandle(ref, () => ({
+    getPosition() {
+      const latest = latestPropsRef.current;
+      const editor = editorRef.current;
+      if (!latest.active || latest.showDiff || editor?.getModel()?.uri.toString() !== `muleditor://document/${latest.tabId}`) return undefined;
+      const position = editor.getPosition();
+      return position ? { line: position.lineNumber, column: position.column } : undefined;
+    }
+  }), []);
 
   function applyCommand(editor: MonacoEditor.IStandaloneCodeEditor, nextCommand: EditorCommand) {
     if (appliedCommandRef.current === nextCommand.id) return;
@@ -209,4 +219,4 @@ export function EditorPane({ tab, tabs, showDiff, diffSourceId, locale, active =
       }}
     />
   );
-}
+});

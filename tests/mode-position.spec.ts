@@ -25,7 +25,7 @@ async function expectSourceLine(page: Page, line: number) {
 async function goToSourceLine(page: Page, line: number) {
   const editor = sourceEditor(page);
   await expect(editor).toBeVisible();
-  await editor.locator(".view-lines").click({ position: { x: 20, y: 10 } });
+  await editor.getByRole("textbox").focus();
   await page.keyboard.press("Control+g");
   const input = page.locator(".quick-input-widget:visible input");
   await expect(input).toBeVisible();
@@ -41,7 +41,7 @@ async function selectFile(page: Page, name: string) {
   await expect(page.locator(".tabs .tab.active .tabName")).toHaveText(name);
 }
 
-test("source cursor beyond line 300 reveals the correct repeated paragraph without changing bytes", async ({ page }) => {
+test("source cursor beyond line 300 reveals the correct repeated paragraph without changing bytes", async ({ page }, testInfo) => {
   const target = "Repeated paragraph: reveal the later occurrence.";
   const document = paragraphDocument(target, "\r\n", true);
   await page.goto("/");
@@ -54,6 +54,7 @@ test("source cursor beyond line 300 reveals the correct repeated paragraph witho
     await expect(duplicates).toHaveText([target, target]);
     await expect(duplicates.nth(1)).toBeInViewport();
     await expect(duplicates.nth(0)).not.toBeInViewport();
+    if (roundtrip === 0) await page.screenshot({ path: testInfo.outputPath("mode-position-later-paragraph.png") });
     await expect(page.locator(".statusBar")).toContainText("已保存");
     await switchMarkdownMode(page, "source");
     await expectSourceLine(page, document.targetLine);
@@ -93,7 +94,7 @@ test("mode position follows inserted source lines and mode switches preserve imm
   expect((await downloadDocument(page)).toString("utf8")).toBe(insertedSource);
 });
 
-test("late items in one long list and code blocks keep independent file positions", async ({ page }) => {
+test("late items in one long list and code blocks keep independent file positions", async ({ page }, testInfo) => {
   const listLines = ["# List document", "", ...Array.from({ length: 400 }, (_, index) => `- List item ${index + 1}: retain original content.`), ""];
   const listTarget = "List item 325: retain original content.";
   const listLine = listLines.indexOf(`- ${listTarget}`) + 1;
@@ -113,6 +114,7 @@ test("late items in one long list and code blocks keep independent file position
   const listItem = immersiveEditor(page).locator("li").filter({ hasText: listTarget });
   await expect(listItem).toBeInViewport();
   await expect(immersiveEditor(page).locator("li").first()).not.toBeInViewport();
+  await page.screenshot({ path: testInfo.outputPath("mode-position-list-325.png") });
   await selectFile(page, "long-code.md");
   await switchMarkdownMode(page, "source");
   await goToSourceLine(page, codeLine);

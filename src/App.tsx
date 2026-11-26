@@ -35,9 +35,11 @@ import type {
   DocumentFormat,
   DocumentTab,
   EditorCommand,
+  EditorPositionHandle,
   OpenedTextFile,
   OutlineItem,
   OutlineNavigationCommand,
+  PositionNavigationCommand,
   WorkspaceReference
 } from "./types";
 
@@ -70,6 +72,9 @@ export function App() {
   const [immersiveCommand, setImmersiveCommand] = useState<{ id: number; tabId: string; action: string }>();
   const [immersiveState, setImmersiveState] = useState<ImmersiveToolbarState>({ activeActions: [], canUndo: false, canRedo: false });
   const [sourceLoaded, setSourceLoaded] = useState(false);
+  const [positionNavigation, setPositionNavigation] = useState<PositionNavigationCommand>();
+  const sourceEditorRef = useRef<EditorPositionHandle>(null);
+  const immersiveEditorRef = useRef<EditorPositionHandle>(null);
   const commandSerial = useRef(0);
   const lastMarkdownId = useRef(initialTab.id);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -532,6 +537,14 @@ export function App() {
   }
 
   function handleMarkdownModeChange(mode: "immersive" | "source") {
+    if (isMarkdown && mode !== markdownMode) {
+      const position = !showDiff
+        ? (markdownMode === "source" ? sourceEditorRef.current : immersiveEditorRef.current)?.getPosition()
+        : undefined;
+      const navigation = position ? { id: ++commandSerial.current, tabId: activeTab.id, ...position } : undefined;
+      setPositionNavigation(mode === "immersive" ? navigation : undefined);
+      setEditorCommand(mode === "source" && navigation ? { ...navigation, kind: "goTo" } : undefined);
+    }
     setMarkdownModes((current) => ({ ...current, [activeTab.id]: mode }));
     setShowDiff(false);
   }
@@ -684,12 +697,14 @@ export function App() {
             {immersiveTab ? (
               <div className="editorSurface" hidden={!showImmersive}>
                 <ImmersiveEditor
+                  ref={immersiveEditorRef}
                   tab={immersiveTab}
                   locale={locale}
                   active={showImmersive}
                   resourceVersion={markdownResourceVersion}
                   command={immersiveCommand?.tabId === immersiveTab.id ? immersiveCommand : undefined}
                   navigation={previewNavigation}
+                  positionNavigation={positionNavigation}
                   onChange={(content) => updateTabContent(immersiveTab.id, content)}
                   onOpenLocalLink={handleOpenPreviewLink}
                   onStateChange={setImmersiveState}
@@ -699,6 +714,7 @@ export function App() {
             {sourceLoaded || showSourcePane ? (
               <div className="editorSurface" hidden={!showSourcePane}>
                 <EditorPane
+                  ref={sourceEditorRef}
                   tab={activeTab}
                   tabs={tabs}
                   active={showSourcePane}

@@ -1,6 +1,6 @@
 [package]
 name = "muleditor"
-version = "0.3.3"
+version = "0.3.4"
 description = "Local-first multi-format structured document editor"
 authors = ["哞-编辑器"]
 license = ""
