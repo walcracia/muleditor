@@ -19,6 +19,7 @@ import {
   listenDroppedPathsFromDesktop,
   openStartupFilesFromDesktop,
   openTextFileFromDesktop,
+  openTextFileAtPathFromDesktop,
   openTextFolderFromDesktop,
   pickSavePath,
   saveTextFileToDesktop,
@@ -30,6 +31,7 @@ import { formatDocument } from "./lib/formatters";
 import type { Locale } from "./lib/i18n";
 import { formatLabel, text } from "./lib/i18n";
 import { buildWorkspaceIndex, emptyFormatNavigation } from "./lib/workspace";
+import { addRecentFiles, loadRecentFiles, recentFileKey, removeRecentFile, saveRecentFiles, type RecentFile } from "./lib/recentFiles";
 import type {
   DocumentAnalysis,
   DocumentFormat,
@@ -54,6 +56,14 @@ const initialTab: DocumentTab = {
 
 export function App() {
   const [tabs, setTabs] = useState<DocumentTab[]>(() => [initialTab]);
+  const tabsRef = useRef(tabs);
+  tabsRef.current = tabs;
+  const recentFilesAvailable = isTauriRuntime();
+  const [recentFiles, setRecentFiles] = useState<RecentFile[]>(() => recentFilesAvailable ? loadRecentFiles() : []);
+  const [openingRecentPath, setOpeningRecentPath] = useState<string>();
+  const [recentFileError, setRecentFileError] = useState<{ path: string; name: string; reason: string }>();
+  const recentOpenPending = useRef(false);
+  const [historyStorageFailed, setHistoryStorageFailed] = useState(false);
   const [activeId, setActiveId] = useState(initialTab.id);
   const [locale, setLocale] = useState<Locale>(() => initialLocale());
   const [showEditor, setShowEditor] = useState(true);
@@ -114,12 +124,22 @@ export function App() {
   }, [showSourcePane]);
 
   useEffect(() => {
+    if (!recentFilesAvailable) return;
+    setHistoryStorageFailed(!saveRecentFiles(recentFiles));
+  }, [recentFiles, recentFilesAvailable]);
+
+  useEffect(() => {
+    if (!recentFilesAvailable || !activeTab.path) return;
+    setRecentFiles((current) => addRecentFiles(current, [{ path: activeTab.path, name: activeTab.name }]));
+  }, [activeTab.id, activeTab.path, activeTab.name, recentFilesAvailable]);
+
+  useEffect(() => {
     folderInputRef.current?.setAttribute("webkitdirectory", "");
     folderInputRef.current?.setAttribute("directory", "");
   }, []);
 
   useEffect(() => {
-    localStorage.setItem("muleditor.locale", locale);
+    try { localStorage.setItem("muleditor.locale", locale); } catch { /* Keep preferences in memory when storage is unavailable. */ }
   }, [locale]);
 
   useEffect(() => {
@@ -176,8 +196,13 @@ export function App() {
     upsertOpenedFiles([file]);
   }
 
+  function rememberRecentFile(file: { path?: string; name: string }) {
+    if (recentFilesAvailable && file.path) setRecentFiles((current) => addRecentFiles(current, [file]));
+  }
+
   function replaceOpenedFiles(files: OpenedTextFile[]) {
     if (!files.length) return;
+    rememberRecentFile(files[0]);
     const nextTabs = files.map(openedFileToTab);
 
     setTabs(nextTabs);
@@ -189,6 +214,7 @@ export function App() {
 
   function upsertOpenedFiles(files: OpenedTextFile[]) {
     if (!files.length) return;
+    rememberRecentFile(files[files.length - 1]);
     const nextTabs = files.map(openedFileToTab);
     const nextActiveId = nextTabs[nextTabs.length - 1].id;
 
@@ -232,7 +258,13 @@ export function App() {
 
   function openedFileToTab(file: OpenedTextFile): DocumentTab {
     const format = detectFormat(file.name, file.content);
-    const id = file.path || file.relativePath || `${file.name}-${Date.now()}`;
+    const existing = file.path
+      ? tabsRef.current.find((tab) => tab.path && recentFileKey(tab.path) === recentFileKey(file.path!))
+      : undefined;
+    let id = existing?.id ?? file.path ?? file.relativePath ?? `${file.name}-${Date.now()}`;
+    // Save As keeps the editor's identity/history, so an old path may now name
+    // a different open document. Reopening that path must get its own tab.
+    if (file.path && !existing && tabsRef.current.some((tab) => tab.id === id)) id = `reopened-${++commandSerial.current}-${Date.now()}`;
     return {
       id,
       name: file.name,
@@ -258,6 +290,37 @@ export function App() {
     }
 
     fileInputRef.current?.click();
+  }
+
+  async function handleOpenRecent(file: RecentFile) {
+    if (!recentFilesAvailable || recentOpenPending.current) return false;
+    setRecentFileError(undefined);
+    const findOpenTab = () => tabsRef.current.find((tab) => tab.path && recentFileKey(tab.path) === recentFileKey(file.path));
+    const focusOpenTab = (tab: DocumentTab) => {
+      setActiveId(tab.id);
+      setShowDiff(false);
+      rememberRecentFile(tab);
+      setStatus(text(locale, "status.opened", { name: tab.name }));
+    };
+    const existing = findOpenTab();
+    if (existing) { focusOpenTab(existing); return true; }
+    recentOpenPending.current = true;
+    setOpeningRecentPath(file.path);
+    try {
+      const opened = await openTextFileAtPathFromDesktop(file.path);
+      const nowOpen = findOpenTab();
+      if (nowOpen) focusOpenTab(nowOpen);
+      else upsertOpenedFile(opened);
+      return true;
+    } catch (error) {
+      const reason = errorMessage(error);
+      setRecentFileError({ path: file.path, name: file.name, reason });
+      setStatus(text(locale, "history.openFailed", { name: file.name, reason }));
+      return false;
+    } finally {
+      recentOpenPending.current = false;
+      setOpeningRecentPath(undefined);
+    }
   }
 
   async function handleOpenFolder() {
@@ -386,6 +449,7 @@ export function App() {
 
     try {
       await saveTextFileToDesktop(activeTab.path, activeTab.content);
+      rememberRecentFile(activeTab);
       markSaved(activeTab.id, activeTab.path);
       setStatus(text(locale, "status.saved", { name: activeTab.name }));
     } catch (error) {
@@ -409,6 +473,7 @@ export function App() {
       const path = await pickSavePath(activeTab.path || activeTab.name);
       if (!path) return;
       await saveTextFileToDesktop(path, activeTab.content);
+      rememberRecentFile({ path, name: fileNameFromPath(path) });
       markSaved(activeTab.id, path);
       setStatus(text(locale, "status.saved", { name: fileNameFromPath(path) }));
     } catch (error) {
@@ -663,6 +728,20 @@ export function App() {
         onMarkdownModeChange={handleMarkdownModeChange}
         onNew={handleNew}
         onOpen={handleOpen}
+        recentFiles={recentFiles}
+        recentFilesAvailable={recentFilesAvailable}
+        historyStorageFailed={historyStorageFailed}
+        openingRecentPath={openingRecentPath}
+        recentFileError={recentFileError ? {
+          path: recentFileError.path,
+          message: text(locale, "history.openFailed", { name: recentFileError.name, reason: recentFileError.reason })
+        } : undefined}
+        onOpenRecent={handleOpenRecent}
+        onRemoveRecent={(path) => {
+          setRecentFiles((current) => removeRecentFile(current, path));
+          if (recentFileError && recentFileKey(recentFileError.path) === recentFileKey(path)) setRecentFileError(undefined);
+        }}
+        onClearRecent={() => { setRecentFiles([]); setRecentFileError(undefined); }}
         onOpenFolder={handleOpenFolder}
         onSave={handleSave}
         onSaveAs={handleSaveAs}
@@ -760,8 +839,9 @@ export function App() {
 }
 
 function initialLocale(): Locale {
-  if (typeof localStorage === "undefined") return "zh";
-  return localStorage.getItem("muleditor.locale") === "en" ? "en" : "zh";
+  try {
+    return typeof localStorage !== "undefined" && localStorage.getItem("muleditor.locale") === "en" ? "en" : "zh";
+  } catch { return "zh"; }
 }
 
 function isUntouchedInitialWorkspace(tabs: DocumentTab[]): boolean {

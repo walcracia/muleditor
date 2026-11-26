@@ -24,10 +24,14 @@ export async function openTextFileFromDesktop(): Promise<OpenedTextFile | undefi
     return undefined;
   }
 
-  const content = await invoke<string>("read_text_file", { path: selected });
+  return openTextFileAtPathFromDesktop(selected);
+}
+
+export async function openTextFileAtPathFromDesktop(path: string): Promise<OpenedTextFile> {
+  const content = await invoke<string>("read_text_file", { path });
   return {
-    path: selected,
-    name: fileNameFromPath(selected),
+    path,
+    name: fileNameFromPath(path),
     content
   };
 }

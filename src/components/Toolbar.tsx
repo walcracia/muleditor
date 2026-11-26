@@ -43,6 +43,7 @@ interface ToolbarProps {
   onOpen: () => void;
   recentFiles: RecentFile[];
   recentFilesAvailable: boolean;
+  historyStorageFailed?: boolean;
   openingRecentPath?: string;
   recentFileError?: { path: string; message: string };
   onOpenRecent: (file: RecentFile) => Promise<boolean> | boolean;
@@ -210,7 +211,7 @@ export function Toolbar(props: ToolbarProps) {
             })}
           </div>
         ) : null}
-        {showRecentMenu ? <RecentFilesMenu locale={props.locale} files={props.recentFiles} available={props.recentFilesAvailable}
+        {showRecentMenu ? <RecentFilesMenu locale={props.locale} files={props.recentFiles} available={props.recentFilesAvailable} storageFailed={props.historyStorageFailed}
           openingPath={props.openingRecentPath} error={props.recentFileError} triggerRef={recentButtonRef}
           onOpen={props.onOpenRecent} onRemove={props.onRemoveRecent} onClear={props.onClearRecent}
           onClose={() => setFileMenu(undefined)} /> : null}

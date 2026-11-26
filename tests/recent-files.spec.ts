@@ -156,6 +156,28 @@ test("reopening the original path after Save As cannot replace the renamed dirty
   await expect(page.locator(".statusBar")).toContainText("已保存");
 });
 
+test("blocked local storage keeps recent files usable for the current session", async ({ page }) => {
+  const bridge = await mockDesktopFiles(page, {
+    files: { [firstPath]: firstSource },
+    startupFiles: [{ path: firstPath, name: "first.md", content: firstSource }]
+  });
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.addInitScript(() => {
+    Object.defineProperty(window, "localStorage", { get() { throw new DOMException("Blocked by fixture", "SecurityError"); } });
+  });
+  await page.goto("/");
+  await expect(immersiveEditor(page).getByRole("heading", { name: "First file", exact: true })).toBeVisible();
+  await historyTrigger(page).click();
+  await expect(historyMenu(page)).toContainText("历史记录暂时无法保存");
+  await expect(openEntry(page, "first.md", firstPath)).toBeVisible();
+  bridge.startupFiles = [];
+  await page.reload();
+  await historyTrigger(page).click();
+  await expect(historyMenu(page)).toContainText("暂无最近打开的文件");
+  expect(errors).toEqual([]);
+});
+
 test("history keyboard controls and long paths fit both languages while browser files require selection", async ({ page }, testInfo) => {
   const longPath = `C:\\Fixtures\\${"长目录 with spaces\\".repeat(8)}shared-name.md`;
   const source = "# Long path fixture\n\nKeep this document.\n";

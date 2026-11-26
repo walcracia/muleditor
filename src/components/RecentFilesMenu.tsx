@@ -9,6 +9,7 @@ interface RecentFilesMenuProps {
   locale: Locale;
   files: RecentFile[];
   available: boolean;
+  storageFailed?: boolean;
   openingPath?: string;
   error?: { path: string; message: string };
   triggerRef: RefObject<HTMLButtonElement>;
@@ -90,6 +91,7 @@ export function RecentFilesMenu(props: RecentFilesMenuProps) {
         if (next && !event.currentTarget.contains(next) && next !== props.triggerRef.current) close(false);
       }}>
       <div className="recentFilesHeader" role="presentation">{text(props.locale, "history.title")}</div>
+      {props.available && props.storageFailed ? <p className="recentFilesEmpty" role="status">{text(props.locale, "history.storageFailed")}</p> : null}
       {files.length ? (
         <div className="recentFilesList" role="presentation">
           {files.map((file, index) => {
