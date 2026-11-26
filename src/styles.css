@@ -260,6 +260,7 @@ button {
 }
 
 .recentFilesMenu button:disabled {
+  color: var(--muted);
   cursor: default;
 }
 
@@ -344,10 +345,6 @@ button {
   min-height: 30px;
   padding: 0 8px;
   font-weight: 620;
-}
-
-.recentFilesFooter button:disabled {
-  color: var(--muted);
 }
 
 .workbench {
