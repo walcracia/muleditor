@@ -370,7 +370,7 @@ export const ImmersiveEditor = forwardRef<EditorPositionHandle, ImmersiveEditorP
       if (cancelled || performance.now() > expires || current.current.active === false || current.current.tab.id !== command.tabId || view.state.doc !== document || !view.state.selection.eq(selection)) return;
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
-        if (cancelled || current.current.active === false || current.current.tab.id !== command.tabId) return;
+        if (cancelled || performance.now() > expires || current.current.active === false || current.current.tab.id !== command.tabId || view.state.doc !== document || !view.state.selection.eq(selection)) return;
         const container = shell.current;
         if (!container) return;
         const coordinates = view.coordsAtPos(selection.head);
