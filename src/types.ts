@@ -59,6 +59,20 @@ export interface DocumentTab {
   dirty: boolean;
 }
 
+export interface DocumentPosition {
+  line: number;
+  column: number;
+}
+
+export interface EditorPositionHandle {
+  getPosition(): DocumentPosition | undefined;
+}
+
+export interface PositionNavigationCommand extends DocumentPosition {
+  id: number;
+  tabId: string;
+}
+
 export interface OpenedTextFile {
   name: string;
   path?: string;

@@ -3,8 +3,9 @@ import { schema as commonMarkdownSchema, defaultMarkdownSerializer, MarkdownSeri
 import { tableNodes } from "prosemirror-tables";
 import type { Token } from "markdown-it";
 import { tokenizeMarkdown } from "./markdown";
+import type { DocumentPosition } from "../types";
 
-const sourceAttrs = { sourceId: { default: null }, sourceLine: { default: null }, sourceEndLine: { default: null } };
+const sourceAttrs = { sourceId: { default: null }, sourceLine: { default: null }, sourceEndLine: { default: null }, sourceContentLine: { default: null } };
 const nodes: Record<string, NodeSpec> = {};
 commonMarkdownSchema.spec.nodes.forEach((name, spec) => {
   nodes[name] = { ...spec, attrs: { ...spec.attrs, ...(spec.group?.includes("block") ? sourceAttrs : {}) } };
@@ -13,7 +14,7 @@ nodes.heading = { ...nodes.heading, content: "inline*" };
 nodes.paragraph = { ...nodes.paragraph, attrs: { ...nodes.paragraph.attrs, ephemeral: { default: false } } };
 nodes.list_item = {
   ...nodes.list_item,
-  attrs: { checked: { default: null } },
+  attrs: { ...sourceAttrs, checked: { default: null } },
   toDOM: (node) => ["li", node.attrs.checked === null ? {} : { "data-checked": String(node.attrs.checked), class: "immersiveTaskItem" }, 0]
 };
 nodes.code_block = { ...nodes.code_block, attrs: { ...nodes.code_block.attrs, language: { default: "" } } };
@@ -52,7 +53,7 @@ nodes.raw_block = {
 for (const [name, spec] of Object.entries(tableNodes({
   tableGroup: "block", cellContent: "block+",
   cellAttributes: { align: { default: null, getFromDOM: (dom) => dom.style.textAlign || null, setDOMAttr: (value, attrs) => { if (value) attrs.style = `text-align:${value}`; } } }
-}))) nodes[name] = { ...spec, attrs: { ...spec.attrs, ...(name === "table" ? sourceAttrs : {}) } };
+}))) nodes[name] = { ...spec, attrs: { ...spec.attrs, ...sourceAttrs } };
 
 const marks = commonMarkdownSchema.spec.marks.update("link", {
   ...commonMarkdownSchema.spec.marks.get("link"),
@@ -141,7 +142,7 @@ export function parseImmersiveMarkdown(source: string): ImmersiveMarkdownSession
     const raw = source.slice(from, to);
     let node: ProseMirrorNode;
     try {
-      const converted = parseBlocks(tokens.slice(index, end), environment);
+      const converted = parseBlocks(tokens.slice(index, end), environment, lineOffset);
       if (converted.length !== 1) throw new Error(`Unsupported block: ${token.type}`);
       node = converted[0];
       node.check();
@@ -197,13 +198,83 @@ export function serializeImmersiveMarkdown(doc: ProseMirrorNode, session?: Immer
   return session ? session.serialize(doc) : immersiveSerializer.serialize(doc);
 }
 
-function parseBlocks(tokens: Token[], environment: Record<string, unknown>): ProseMirrorNode[] {
+// Source attributes in the live document describe its import snapshot. Parse the
+// current source for navigation only, then transfer the node path to the live
+// document so rich edits keep their existing selection/history and source bytes.
+function transferPosition(from: ProseMirrorNode, to: ProseMirrorNode, position: number): number {
+  const resolved = from.resolve(Math.max(0, Math.min(position, from.content.size)));
+  let target = to;
+  let start = 0;
+  for (let depth = 0; depth <= resolved.depth; depth++) {
+    const index = Math.min(resolved.index(depth), target.childCount);
+    let offset = 0;
+    for (let child = 0; child < index; child++) offset += target.child(child).nodeSize;
+    const next = target.maybeChild(index);
+    if (depth === resolved.depth || !next || next.type !== resolved.node(depth + 1).type) {
+      const sourceOffset = resolved.pos - resolved.posAtIndex(resolved.index(depth), depth);
+      return Math.min(to.content.size, start + offset + Math.min(Math.max(0, sourceOffset), next?.isText ? next.nodeSize : 0));
+    }
+    start += offset + 1;
+    target = next;
+  }
+  return start;
+}
+
+function textLines(node: ProseMirrorNode): string[] {
+  return node.textBetween(0, node.content.size, "\n", (leaf) => leaf.type.name === "hard_break" ? "\n" : "\ufffc").split("\n");
+}
+
+export function immersivePositionAtSource(source: string, doc: ProseMirrorNode, location: DocumentPosition): number {
+  const parsed = parseImmersiveMarkdown(source).doc;
+  let best = { pos: 0, node: parsed.firstChild!, distance: Infinity, depth: -1 };
+  parsed.descendants((node, pos) => {
+    if (node.attrs.sourceLine == null) return;
+    const distance = Math.max(Number(node.attrs.sourceLine) - location.line, location.line - Number(node.attrs.sourceEndLine), 0);
+    const depth = parsed.resolve(pos).depth;
+    if (distance < best.distance || (distance === best.distance && depth > best.depth)) best = { pos, node, distance, depth };
+  });
+  let position = best.pos;
+  if (best.node?.isTextblock && !best.node.isAtom) {
+    const lines = textLines(best.node);
+    const row = Math.max(0, Math.min(location.line - Number(best.node.attrs.sourceContentLine ?? best.node.attrs.sourceLine), lines.length - 1));
+    const rawLine = source.split(/\r\n|\n|\r/)[Math.max(0, location.line - 1)] ?? "";
+    const prefix = Math.max(0, rawLine.indexOf(lines[row]));
+    position++;
+    for (let line = 0; line < row; line++) position += lines[line].length + 1;
+    position += Math.max(0, Math.min(location.column - 1 - prefix, lines[row].length));
+  }
+  return transferPosition(parsed, doc, position);
+}
+
+export function sourcePositionAtImmersive(source: string, doc: ProseMirrorNode, position: number): DocumentPosition {
+  const parsed = parseImmersiveMarkdown(source).doc;
+  const resolved = parsed.resolve(transferPosition(doc, parsed, position));
+  for (let depth = resolved.depth; depth > 0; depth--) {
+    const node = resolved.node(depth);
+    if (node.attrs.sourceLine == null) continue;
+    if (!node.isTextblock || node.isAtom) return { line: Number(node.attrs.sourceLine), column: 1 };
+    const before = node.textBetween(0, resolved.pos - resolved.start(depth), "\n", (leaf) => leaf.type.name === "hard_break" ? "\n" : "\ufffc").split("\n");
+    const line = Math.min(Number(node.attrs.sourceEndLine), Number(node.attrs.sourceContentLine ?? node.attrs.sourceLine) + before.length - 1);
+    const rawLine = source.split(/\r\n|\n|\r/)[line - 1] ?? "";
+    const prefix = Math.max(0, rawLine.indexOf(textLines(node)[before.length - 1] ?? ""));
+    return { line, column: Math.min(rawLine.length + 1, prefix + before[before.length - 1].length + 1) };
+  }
+  const node = resolved.nodeAfter ?? resolved.nodeBefore;
+  return { line: Number(node?.attrs.sourceLine ?? 1), column: 1 };
+}
+
+function parseBlocks(tokens: Token[], environment: Record<string, unknown>, lineOffset: number): ProseMirrorNode[] {
   const result: ProseMirrorNode[] = [];
   for (let index = 0; index < tokens.length;) {
     const token = tokens[index];
     const end = blockEnd(tokens, index);
     const inside = tokens.slice(index + 1, end - 1);
     const attrs: Record<string, unknown> = {};
+    if (token.map) {
+      attrs.sourceLine = token.map[0] + lineOffset + 1;
+      attrs.sourceEndLine = token.map[1] + lineOffset;
+      attrs.sourceContentLine = Number(attrs.sourceLine) + (token.type === "fence" || token.type === "math_block" ? 1 : 0);
+    }
     let name = "";
     let content: ProseMirrorNode[] | undefined;
     if (["paragraph_open", "heading_open"].includes(token.type)) {
@@ -221,9 +292,9 @@ function parseBlocks(tokens: Token[], environment: Record<string, unknown>): Pro
       if (name === "table_cell" || name === "table_header") {
         attrs.align = token.attrGet("style")?.toString().replace("text-align:", "") || null;
         content = [immersiveSchema.nodes.paragraph.create(null, parseInline(inside.find((child) => child.type === "inline")?.children ?? [], environment))];
-      } else content = parseBlocks(inside, environment);
+      } else content = parseBlocks(inside, environment, lineOffset);
     } else if (["thead_open", "tbody_open"].includes(token.type)) {
-      result.push(...parseBlocks(inside, environment));
+      result.push(...parseBlocks(inside, environment, lineOffset));
       index = end;
       continue;
     } else if (token.type === "fence" || token.type === "code_block" || token.type === "math_block") {

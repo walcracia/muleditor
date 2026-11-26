@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { EditorState, TextSelection, type Command, type SelectionBookmark } from "prosemirror-state";
 import { EditorView, Decoration, DecorationSet, type NodeView } from "prosemirror-view";
 import { Plugin } from "prosemirror-state";
@@ -11,9 +11,9 @@ import { tableEditing, goToNextCell, addRowAfter, addColumnAfter, deleteRow, del
 import { dropCursor } from "prosemirror-dropcursor";
 import { gapCursor } from "prosemirror-gapcursor";
 import type { Node as ProseMirrorNode } from "prosemirror-model";
-import type { DocumentTab, OutlineNavigationCommand } from "../types";
+import type { DocumentTab, EditorPositionHandle, OutlineNavigationCommand, PositionNavigationCommand } from "../types";
 import type { Locale } from "../lib/i18n";
-import { immersiveSchema as schema, parseImmersiveMarkdown, isSafeImmersiveLink } from "../lib/immersiveMarkdown";
+import { immersiveSchema as schema, parseImmersiveMarkdown, isSafeImmersiveLink, immersivePositionAtSource, sourcePositionAtImmersive } from "../lib/immersiveMarkdown";
 import { extractMarkdownAnchors, extractMarkdownHeadings, renderMarkdownDocument } from "../lib/markdown";
 import { resolveMarkdownImage } from "../lib/markdownResources";
 import "prosemirror-view/style/prosemirror.css";
@@ -32,6 +32,7 @@ export interface ImmersiveEditorProps {
   active?: boolean;
   command?: { id: number; action: string };
   navigation?: OutlineNavigationCommand;
+  positionNavigation?: PositionNavigationCommand;
   onChange: (source: string) => void;
   onOpenLocalLink?: (target: string) => void;
   onStateChange?: (state: ImmersiveToolbarState) => void;
@@ -57,7 +58,7 @@ const labels = {
   en: { editor: "Immersive editor", edit: "Edit", math: "math", mermaid: "diagram", image: "image", raw: "raw content", footnote: "footnote", link: "link", emoji: "emoji", source: "source", address: "address", label: "Text / alternative text", apply: "Apply", cancel: "Cancel", insert: "Insert", loading: "Rendering…", failed: "Content could not be rendered", row: "Add row", column: "Add column", deleteRow: "Delete row", deleteColumn: "Delete column", deleteTable: "Delete table", table: "Table actions", follow: "Ctrl / ⌘ + click to open link", metadata: "Document metadata", definitions: "Footnotes and reference definitions" }
 };
 
-export function ImmersiveEditor(props: ImmersiveEditorProps) {
+export const ImmersiveEditor = forwardRef<EditorPositionHandle, ImmersiveEditorProps>(function ImmersiveEditor(props, ref) {
   const current = useRef(props);
   current.current = props;
   const mount = useRef<HTMLDivElement>(null);
@@ -68,6 +69,8 @@ export function ImmersiveEditor(props: ImmersiveEditorProps) {
   const atoms = useRef(new Set<RichNodeView>());
   const lastCommand = useRef<number>();
   const lastNavigation = useRef<number>();
+  const lastPositionNavigation = useRef<number>();
+  const positionReveal = useRef<(() => void)>();
   const lastSummary = useRef("");
   const syncRef = useRef<() => void>(() => {});
   const openFormRef = useRef<(kind: FormKind, node?: ProseMirrorNode, position?: number) => void>(() => {});
@@ -76,6 +79,14 @@ export function ImmersiveEditor(props: ImmersiveEditorProps) {
   const [error, setError] = useState("");
   const [inTable, setInTable] = useState(false);
   const words = labels[props.locale];
+
+  useImperativeHandle(ref, () => ({ getPosition() {
+    const view = viewRef.current;
+    const tab = current.current.tab;
+    if (!view || current.current.active === false || shownTab.current !== tab.id) return;
+    const source = documents.current.get(tab.id)?.source ?? tab.content;
+    return sourcePositionAtImmersive(source, view.state.doc, view.state.selection.head);
+  } }), []);
 
   function publishState(view: EditorView) {
     const state = view.state;
@@ -199,7 +210,7 @@ export function ImmersiveEditor(props: ImmersiveEditorProps) {
     const nodeViews: Record<string, (node: ProseMirrorNode, view: EditorView, getPos: () => number | undefined) => NodeView> = {};
     for (const name of ["math_block", "mermaid_block", "image", "inline_math", "footnote_ref", "raw_inline", "raw_block"]) {
       nodeViews[name] = (node, view, getPos) => {
-        const instance = new RichNodeView(node, view, getPos, context, getSource, documentRender, open, () => atoms.current.delete(instance));
+        const instance = new RichNodeView(node, view, getPos, context, getSource, documentRender, open, () => atoms.current.delete(instance), () => positionReveal.current?.());
         atoms.current.add(instance);
         return instance;
       };
@@ -342,6 +353,43 @@ export function ImmersiveEditor(props: ImmersiveEditorProps) {
 
   useEffect(() => { syncRef.current(); }, [props.tab.id, props.tab.content, props.active]);
   useEffect(() => {
+    const command = props.positionNavigation;
+    if (!command || props.active === false || command.tabId !== props.tab.id || lastPositionNavigation.current === command.id) return;
+    syncRef.current();
+    const view = viewRef.current;
+    if (!view || shownTab.current !== command.tabId) return;
+    lastPositionNavigation.current = command.id;
+    const position = immersivePositionAtSource(props.tab.content, view.state.doc, command);
+    view.dispatch(view.state.tr.setSelection(TextSelection.near(view.state.doc.resolve(position))).setMeta("addToHistory", false));
+    const selection = view.state.selection;
+    const document = view.state.doc;
+    const expires = performance.now() + 10_000;
+    let frame = 0;
+    let cancelled = false;
+    const reveal = () => {
+      if (cancelled || performance.now() > expires || current.current.active === false || current.current.tab.id !== command.tabId || view.state.doc !== document || !view.state.selection.eq(selection)) return;
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        if (cancelled || current.current.active === false || current.current.tab.id !== command.tabId) return;
+        const container = shell.current;
+        if (!container) return;
+        const coordinates = view.coordsAtPos(selection.head);
+        container.scrollTop += coordinates.top - container.getBoundingClientRect().top - container.clientHeight / 2;
+      });
+    };
+    const cancel = () => { cancelled = true; cancelAnimationFrame(frame); };
+    positionReveal.current = reveal;
+    const container = shell.current;
+    for (const event of ["pointerdown", "keydown", "wheel", "touchstart"]) container?.addEventListener(event, cancel, { passive: true });
+    view.focus();
+    reveal();
+    return () => {
+      cancel();
+      positionReveal.current = undefined;
+      for (const event of ["pointerdown", "keydown", "wheel", "touchstart"]) container?.removeEventListener(event, cancel);
+    };
+  }, [props.positionNavigation, props.active, props.tab.id]);
+  useEffect(() => {
     if (props.active === false) return;
     syncRef.current();
     for (const node of atoms.current) node.refresh();
@@ -431,7 +479,7 @@ export function ImmersiveEditor(props: ImmersiveEditorProps) {
     </div> : null}
     <div ref={mount} className="immersiveEditorMount" />
   </section>;
-}
+});
 
 function ancestor(state: EditorState, name: string): { node: ProseMirrorNode; pos: number } | undefined {
   for (let depth = state.selection.$from.depth; depth > 0; depth--) {
@@ -636,7 +684,7 @@ class RichNodeView implements NodeView {
   private button: HTMLButtonElement;
   private controller?: AbortController;
   private disposed = false;
-  constructor(private node: ProseMirrorNode, private view: EditorView, private getPos: () => number | undefined, private context: () => ImmersiveEditorProps, private source: () => string, private documentRender: SharedDocumentRender, private open: (kind: FormKind, node?: ProseMirrorNode, position?: number) => void, private remove: () => void) {
+  constructor(private node: ProseMirrorNode, private view: EditorView, private getPos: () => number | undefined, private context: () => ImmersiveEditorProps, private source: () => string, private documentRender: SharedDocumentRender, private open: (kind: FormKind, node?: ProseMirrorNode, position?: number) => void, private remove: () => void, private onRender: () => void) {
     this.dom = document.createElement(node.isBlock ? "div" : "span");
     this.dom.className = `immersiveNodeView immersiveNode-${node.type.name}`;
     this.dom.contentEditable = "false";
@@ -736,6 +784,7 @@ class RichNodeView implements NodeView {
     } catch (failure) {
       if (!controller.signal.aborted && !this.disposed) { this.preview.textContent = `${words.failed}: ${failure instanceof Error ? failure.message : String(failure)}`; this.dom.classList.add("immersiveNodeError"); }
     }
+    if (!controller.signal.aborted && !this.disposed) this.onRender();
   }
   update(node: ProseMirrorNode) { if (node.type !== this.node.type) return false; if (!node.eq(this.node)) { this.node = node; void this.refresh(); } return true; }
   pause() { this.controller?.abort(); }
