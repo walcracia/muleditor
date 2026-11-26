@@ -22,6 +22,8 @@ import {
 import type { DocumentFormat } from "../types";
 import type { Locale } from "../lib/i18n";
 import { formatLabel, text } from "../lib/i18n";
+import type { RecentFile } from "../lib/recentFiles";
+import { RecentFilesMenu } from "./RecentFilesMenu";
 
 interface ToolbarProps {
   activeFormat: DocumentFormat;
@@ -39,6 +41,13 @@ interface ToolbarProps {
   onMarkdownModeChange: (mode: "immersive" | "source") => void;
   onNew: (format: DocumentFormat) => void;
   onOpen: () => void;
+  recentFiles: RecentFile[];
+  recentFilesAvailable: boolean;
+  openingRecentPath?: string;
+  recentFileError?: { path: string; message: string };
+  onOpenRecent: (file: RecentFile) => Promise<boolean> | boolean;
+  onRemoveRecent: (path: string) => void;
+  onClearRecent: () => void;
   onOpenFolder: () => void;
   onSave: () => void;
   onSaveAs: () => void;
@@ -66,10 +75,13 @@ const newFileFormats: Array<{ format: DocumentFormat; extension: string }> = [
 ];
 
 export function Toolbar(props: ToolbarProps) {
-  const [showNewMenu, setShowNewMenu] = useState(false);
+  const [fileMenu, setFileMenu] = useState<"new" | "recent">();
+  const showNewMenu = fileMenu === "new";
+  const showRecentMenu = fileMenu === "recent";
   const newFileMenuRef = useRef<HTMLDivElement>(null);
   const newButtonRef = useRef<HTMLButtonElement>(null);
   const firstNewFormatRef = useRef<HTMLButtonElement>(null);
+  const recentButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!showNewMenu) return;
@@ -77,12 +89,12 @@ export function Toolbar(props: ToolbarProps) {
     const focusFrame = window.requestAnimationFrame(() => firstNewFormatRef.current?.focus());
     const handleOutsidePointerDown = (event: PointerEvent) => {
       if (!newFileMenuRef.current?.contains(event.target as Node)) {
-        setShowNewMenu(false);
+        setFileMenu(undefined);
       }
     };
     const handleEscape = (event: globalThis.KeyboardEvent) => {
       if (event.key !== "Escape") return;
-      setShowNewMenu(false);
+      setFileMenu(undefined);
       newButtonRef.current?.focus();
     };
 
@@ -97,7 +109,7 @@ export function Toolbar(props: ToolbarProps) {
   }, [showNewMenu]);
 
   function handleNewFormat(format: DocumentFormat) {
-    setShowNewMenu(false);
+    setFileMenu(undefined);
     props.onNew(format);
     newButtonRef.current?.focus();
   }
@@ -129,11 +141,11 @@ export function Toolbar(props: ToolbarProps) {
             aria-haspopup="menu"
             aria-expanded={showNewMenu}
             aria-label={text(props.locale, "toolbar.newMenu")}
-            onClick={() => setShowNewMenu((current) => !current)}
+            onClick={() => setFileMenu((current) => current === "new" ? undefined : "new")}
             onKeyDown={(event) => {
               if (event.key !== "ArrowDown") return;
               event.preventDefault();
-              setShowNewMenu(true);
+              setFileMenu("new");
             }}
             title={text(props.locale, "toolbar.newMenu")}
           >
@@ -144,6 +156,17 @@ export function Toolbar(props: ToolbarProps) {
           <button type="button" onClick={props.onOpen} title={text(props.locale, "toolbar.open")}>
             <FileInput size={16} />
             {text(props.locale, "toolbar.open")}
+          </button>
+          <button ref={recentButtonRef} type="button" className={showRecentMenu ? "recentFilesToggle isActive" : "recentFilesToggle"}
+            aria-label={text(props.locale, "history.title")} title={text(props.locale, "history.title")}
+            aria-haspopup="menu" aria-expanded={showRecentMenu} aria-controls={showRecentMenu ? "recentFilesMenu" : undefined}
+            onClick={() => setFileMenu((current) => current === "recent" ? undefined : "recent")}
+            onKeyDown={(event) => {
+              if (event.key !== "ArrowDown") return;
+              event.preventDefault();
+              setFileMenu("recent");
+            }}>
+            <ChevronDown size={13} aria-hidden="true" />
           </button>
           <button type="button" onClick={props.onOpenFolder} title={text(props.locale, "toolbar.openFolder")}>
             <FolderOpen size={16} />
@@ -187,6 +210,10 @@ export function Toolbar(props: ToolbarProps) {
             })}
           </div>
         ) : null}
+        {showRecentMenu ? <RecentFilesMenu locale={props.locale} files={props.recentFiles} available={props.recentFilesAvailable}
+          openingPath={props.openingRecentPath} error={props.recentFileError} triggerRef={recentButtonRef}
+          onOpen={props.onOpenRecent} onRemove={props.onRemoveRecent} onClear={props.onClearRecent}
+          onClose={() => setFileMenu(undefined)} /> : null}
       </div>
       <div className="toolbarGroup">
         {props.activeFormat === "markdown" ? (

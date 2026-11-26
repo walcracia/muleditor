@@ -193,6 +193,163 @@ button {
   font-weight: 520;
 }
 
+.toolbarGroup button.recentFilesToggle {
+  width: 24px;
+  min-width: 24px;
+  padding: 0;
+  justify-content: center;
+}
+
+.toolbarFileActions .toolbarGroup button.recentFilesToggle > svg:first-child {
+  display: block;
+}
+
+.recentFilesMenu {
+  position: absolute;
+  top: calc(100% + 7px);
+  left: 0;
+  z-index: 45;
+  display: flex;
+  flex-direction: column;
+  width: min(480px, calc(100vw - 24px));
+  max-height: min(520px, calc(100vh - 64px));
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  box-shadow: 0 8px 20px rgba(18, 28, 40, 0.16);
+  outline: none;
+}
+
+.recentFilesHeader {
+  flex: 0 0 auto;
+  padding: 7px 8px 9px;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.recentFilesList {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-color: var(--line-strong) transparent;
+  scrollbar-width: thin;
+}
+
+.recentFileRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 30px;
+  align-items: start;
+}
+
+.recentFilesMenu button {
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.recentFilesMenu button:hover:not(:disabled),
+.recentFilesMenu button:focus-visible {
+  outline: none;
+  background: var(--accent-soft);
+  color: #174fa7;
+}
+
+.recentFilesMenu button:disabled {
+  cursor: default;
+}
+
+.recentFileOpen {
+  display: flex;
+  min-width: 0;
+  min-height: 48px;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+}
+
+.recentFileOpen > svg,
+.recentFileOpening {
+  flex: 0 0 auto;
+}
+
+.recentFileDescription {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.recentFileName,
+.recentFilePath {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  unicode-bidi: plaintext;
+}
+
+.recentFileName {
+  font-weight: 620;
+}
+
+.recentFilePath,
+.recentFileOpening {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.recentFileRemove {
+  display: flex;
+  width: 28px;
+  height: 28px;
+  margin-top: 10px;
+  align-items: center;
+  justify-content: center;
+}
+
+.recentFileError {
+  display: flex;
+  grid-column: 1 / -1;
+  flex-direction: column;
+  gap: 3px;
+  padding: 0 8px 9px 32px;
+  color: var(--danger);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.recentFilesEmpty {
+  margin: 0;
+  padding: 4px 8px 12px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.recentFilesFooter {
+  flex: 0 0 auto;
+  padding-top: 4px;
+  border-top: 1px solid var(--line);
+}
+
+.recentFilesFooter button {
+  width: 100%;
+  min-height: 30px;
+  padding: 0 8px;
+  font-weight: 620;
+}
+
+.recentFilesFooter button:disabled {
+  color: var(--muted);
+}
+
 .workbench {
   --workspace-width: 244px;
   --inspector-width: 304px;
