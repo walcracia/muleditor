@@ -12,7 +12,7 @@ Markdown 两种模式切换时会定位到当前光标对应的内容，长列�
 
 工作区、大纲和问题面板可分别关闭，编辑区自动扩展。通过顶部同一组“工作区 / 问题 / 大纲”按钮切换或重新打开；支持格式和操作状态放在底部状态栏。隐藏面板不会关闭文件或清除问题。
 
-桌面版点击“打开”右侧的下拉箭头可查看最近 20 个本地文件，重启后仍保留。选择记录会读取磁盘最新内容；文件已在标签中打开时，保留现有修改并切换过去。支持移除单条、清空记录及文件不可访问时重试；记录仅含路径、名称和时间，保存在本机。浏览器中的本地文件仍需重新选择。
+桌面版点击“打开”右侧的下拉箭头可查看最近 20 个本地文件，重启后仍保留。选择记录会读取磁盘最新内容；文件已在标签中打开时，保留现有修改并切换过去。支持移除单条、清空记录及文件不可访问时重试；记录仅含路径、名称和时间，保存在本机，历史从 0.3.5 开始积累。浏览器中的本地文件仍需重新选择。
 
 状态栏以亮色实底高亮当前文档格式，切换文件时同步更新；不再重复显示独立的 Markdown 等类型文字，悬停当前项可看具体格式。SPDX 的 JSON、YAML 和标签/值文档统一高亮 SPDX。产品界面不展示运行框架名称。
 
@@ -26,7 +26,7 @@ Markdown 两种模式切换时会定位到当前光标对应的内容，长列�
 
 前往 [GitHub Releases](https://github.com/walcracia/muleditor/releases) 下载已发布版本，在对应版本的 Assets 中选择：
 
-当前已验证版本：[v0.3.4](https://github.com/walcracia/muleditor/releases/tag/v0.3.4)（[便携 ZIP](https://github.com/walcracia/muleditor/releases/download/v0.3.4/MulEditor-0.3.4-windows-x64-portable.zip) · [安装包](https://github.com/walcracia/muleditor/releases/download/v0.3.4/MulEditor-0.3.4-windows-x64-setup.exe) · [校验清单](https://github.com/walcracia/muleditor/releases/download/v0.3.4/SHA256SUMS.txt)）。
+当前已验证版本：[v0.3.5](https://github.com/walcracia/muleditor/releases/tag/v0.3.5)（[便携 ZIP](https://github.com/walcracia/muleditor/releases/download/v0.3.5/MulEditor-0.3.5-windows-x64-portable.zip) · [安装包](https://github.com/walcracia/muleditor/releases/download/v0.3.5/MulEditor-0.3.5-windows-x64-setup.exe) · [校验清单](https://github.com/walcracia/muleditor/releases/download/v0.3.5/SHA256SUMS.txt)）。
 
 - `MulEditor-{version}-windows-x64-setup.exe`：Windows x64 安装包。
 - `MulEditor-{version}-windows-x64-portable.zip`：解压后运行的便携包。
@@ -96,6 +96,7 @@ pwsh -NoProfile -File ./scripts/package-release.ps1 -SourceCommit $sourceCommit
 | `src/lib/formatAdapters.ts` | 各格式的分析、引用、导航和片段入口 |
 | `src/lib/formatAnalyzers.ts`、`workspaceExtractors.ts` | 格式诊断、目录及跨文件引用提取 |
 | `src/lib/fileAccess.ts`、`exporters.ts` | 桌面文件桥接、浏览器下载与导出 |
+| `src/lib/recentFiles.ts`、`src/components/RecentFilesMenu.tsx` | 最近文件元数据、持久化与重开菜单 |
 | `src/lib/i18n.ts` | 中文/英文界面文本 |
 | `src/main.tsx` | React 启动与 Monaco 运行时版本 |
 | `src/lib/markdown.ts`、`markdownSanitize.ts`、`mermaid.ts` | Markdown 标题/脚注解析、统一渲染、HTML/SVG 净化和图表 |

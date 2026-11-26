@@ -12,17 +12,24 @@
 
 每次结束都检查这三项，并更新本文当前状态与设计文档中的相应记录。
 
-## 当前交接：2026-11-26 最近打开文件（进行中）
+## 当前交接：2026-11-26 最近打开文件（0.3.5）
 
 - 用户要求：增加历史入口，能重新打开曾经打开过的文件。基准 `3c0b2212492ead688cd2f2ed23f225bc29db307d`，集成分支 `agent/recent-files-20261126`，目标 0.3.5。存储模块、工具栏菜单与浏览器回归分别在独立工作树开发，主 agent 整合 App、文件访问、文档与发布。
 - 设计：在“打开”旁增加下拉入口，桌面版本机保存最近 20 个成功打开/实际查看的文件路径，去重并按最近使用排序；支持移除单条和清空，不保存正文或未保存编辑，不进 Git。打开文件夹不把全部文件灌入历史，仅记录当前查看的文件。
 - 重开时从磁盘重新读取；若文件已在标签中打开，直接切换并保留未保存内容。失败保留历史项并显示可恢复的错误，允许重试或移除。另存成功也记录新路径。浏览器不能凭历史路径重获本机文件权限，仍需用户重新选择文件，不冒充持久文件访问能力。
 - 实现入口：`src/lib/recentFiles.ts` 负责最多 20 条 MRU、Windows 路径身份、元数据校验及容错存储；`App.tsx` 负责实际查看/打开/另存后的记录、已有标签保护及异步重开；`fileAccess.ts` 复用原有 `read_text_file`，无新增 Rust 命令。`RecentFilesMenu.tsx` / `Toolbar.tsx` / `styles.css` 提供双语、键盘、空/忙/错误状态与窄窗口布局。
+- 路径边界：仅收录完整绝对路径，Windows 路径按大小写/斜杠/扩展前缀做字面去重，不解析符号链接或文件系统别名。旧命令行入口若传相对路径，本版不会记录；请用绝对路径重新打开。普通文件对话框、文件夹和系统拖放均提供绝对路径。
 - 另存后保留原编辑器 id，但原路径可能不再对应该标签；重开原路径时分配独立 id，保护新路径标签中的修改和撤销记录。文件错误保存原始信息、按当前语言生成文案。存储被阻止时保留本次运行内记录，菜单持续提示无法持久化，语言偏好读取/写入也做容错。
 - 本轮 Windows x64、Node 22.14.0/npm 10.9.2、Rust 1.99.1：沿用本会话已完成的 `npm ci`（未新增依赖，仅项目版本变化），类型检查、构建、108 项前端测试、Rust check/test（`--manifest-path src-tauri/Cargo.toml --locked -j 1`，9 项）及版本校验通过。保留既有大 chunk 提示。
 - 首轮 4 项历史专项及完整 30 组 Edge 回归通过。复核发现另存标签 id 冲突与旧语言错误文本后修正，并增加回归；5 项专项通过。一次 31 组完整运行有 30 项通过，既有格式状态用例的 Monaco loader.js 请求因 `net::ERR_NETWORK_CHANGED` 失败，未记为通过；改用本机代理重验，未放宽断言/超时。新增存储阻止用例又发现一次状态提示被打开消息覆盖，改为菜单内持久提示后，最终完整 32 组通过（1.1 分钟），含实际下载 HTML 的离线渲染/图片/图表/字体与净化，以及 6 项历史场景。
 - 浏览器桌面文件场景使用仅存在于测试的 IPC 模拟，不能冒充原生文件访问。已核对双语截图：[中文](assets/muleditor-0.3.5-recent-files-zh.png)、[英文最小窗口](assets/muleditor-0.3.5-recent-files-en-minimum.png)。静态设计扫描未报匹配，但未运行需页面解析的规则，不称为完整 UI 审计。
-- 当前阶段：实现、完整前端/浏览器/后端检查完成，独立用户目录下的原生重启验证、标准打包与云端发布待完成。稳定版本仍为 v0.3.4；下一步从包含本交接的干净提交构建，真实验证历史重开，再推送/发布 v0.3.5 并核验下载。
+- 发行源 `0895d1aa1b712c1978489fd8a34e57fb81451e06` 已合入并推送 `main`，标签 v0.3.5 指向该提交。本机从该干净提交执行 `npm.cmd run tauri:build -- --no-sign` 与标准打包脚本（版本 0.3.5、源提交参数）均通过，生成 EXE/NSIS/便携 ZIP。
+- 原生检查使用公开测试文件及独立 WebView2 用户目录；通过 [WEBVIEW2_USER_DATA_FOLDER](https://learn.microsoft.com/en-us/microsoft-edge/webview2/reference/win32/webview2-idl) 仅为测试进程指定目录，并核对 WebView2 子进程参数，未改用户正常配置。程序真实打开了测试文件（可访问性树读到 Native history / Initial file text.），关闭后在该隔离目录读到历史键及文件名，证明原生记录已落盘。
+- **原生交互未完成**：桌面自动输入先后返回 `GetCursorPos failed: 拒绝访问。 (0x80070005)` 与 `failed to activate captured window`，无法点击/键盘打开菜单。未把 IPC 模拟或磁盘键存在冒充原生重启后重开成功。只结束本次创建的测试进程，未操作用户已运行的编辑器。恢复步骤：在可交互的 Windows 桌面，使用全新隔离用户目录启动公开夹具，退出后修改夹具正文，再不带参数启动，验证历史重开读到新内容；随后测试缺失文件重试。安装器安装本轮也未执行。
+- [云端 CI](https://github.com/walcracia/muleditor/actions/runs/45801557504) 成功：锁定安装、版本/类型/构建、108 前端测试、32 Chromium 回归（55.7 秒）、9 Rust 测试通过。前端 artifact `muleditor-web-0895d1aa1b712c1978489fd8a34e57fb81451e06` 已实际下载，含 index.html 和 123 个 assets，保留至 2026-12-26 18:33 Asia/Shanghai。
+- [Windows Release](https://github.com/walcracia/muleditor/actions/runs/45802548547) 成功，[v0.3.5](https://github.com/walcracia/muleditor/releases/tag/v0.3.5) 已公开。三个正式附件均已实际下载；便携包仅 README.txt 与哞-编辑器.exe，README 的完整源提交匹配。EXE FileVersion/ProductVersion 为 0.3.5，x64/PE32+/GUI 子系统，EXE 与安装器均 NotSigned；EXE SHA-256 `fb7e917e80fb1e1eeda4eeef4d9de77756a385cc868d3090c4fb5b6485cf4536`。下载版未启动，不冒充完整原生验收。
+- 下载：[便携 ZIP](https://github.com/walcracia/muleditor/releases/download/v0.3.5/MulEditor-0.3.5-windows-x64-portable.zip) SHA-256 `6430103d7d3d4fbfa7cfdbf126d2891a4c4598f6915cc5fc781a200506d2c0d9`；[安装包](https://github.com/walcracia/muleditor/releases/download/v0.3.5/MulEditor-0.3.5-windows-x64-setup.exe) SHA-256 `6be8274637e545560a28ca7af5af40abac2525613479cf02694af83eeaf7a56e`，均与[校验清单](https://github.com/walcracia/muleditor/releases/download/v0.3.5/SHA256SUMS.txt)及服务端 digest 匹配。注释标签对象与 peeled 源提交均经 API 核对一致。
+- 下一步：代码、自动化检查和发布已完成；原生菜单交互验收仍待可交互桌面环境补做，恢复步骤见上述限制。包含本交接的后续提交仅确认文档，运行 `git log -1` 查询。新电脑先检查 Git 状态、fetch，干净工作区 `git pull --ff-only`，首次 `npm ci`，按用户后续优先级继续；不移动 v0.3.5 或替换附件。历史从本版开始积累，既有 CDN/未签名/编辑会话不持久化边界保留。
 
 ## 已完成交接：2026-11-26 模式切换保留光标位置
 
