@@ -10,6 +10,7 @@ interface DesktopFixtures {
   files: Record<string, string>;
   startupFiles?: OpenedFile[];
   dialogPaths?: string[];
+  savePaths?: string[];
 }
 
 /** Test-only IPC simulation following @tauri-apps/api/mocks, not a native file-system test. */
@@ -19,6 +20,7 @@ export async function mockDesktopFiles(page: Page, fixtures: DesktopFixtures) {
   const state = {
     startupFiles: fixtures.startupFiles ?? [],
     dialogPaths: [...(fixtures.dialogPaths ?? [])],
+    savePaths: [...(fixtures.savePaths ?? [])],
     reads: [] as string[],
     writes: [] as Array<{ path: string; content: string }>,
     setFile(path: string, content: string) { files.set(fileKey(path), content); }
@@ -26,6 +28,7 @@ export async function mockDesktopFiles(page: Page, fixtures: DesktopFixtures) {
   await page.exposeFunction("testDesktopInvoke", (command: string, args: Record<string, unknown> = {}) => {
     if (command === "read_startup_files") return state.startupFiles;
     if (command === "plugin:dialog|open") return state.dialogPaths.shift() ?? null;
+    if (command === "plugin:dialog|save") return state.savePaths.shift() ?? null;
     if (command === "plugin:event|listen") return args.handler;
     if (command === "plugin:event|unlisten") return null;
     if (command === "read_text_file") {

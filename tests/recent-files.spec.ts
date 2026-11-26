@@ -108,11 +108,51 @@ test("missing files retain an actionable history entry and can be retried after 
   await expect(openEntry(page, "missing.md", missingPath)).toBeVisible();
   await expect.poll(async () => (await storedHistory(page))[0]?.path).toBe(missingPath);
   await expect(page.locator(".tabs .tab.active .tabName")).toHaveText("untitled.md");
+  await page.locator(".toolbar").getByRole("button", { name: "EN", exact: true }).click();
+  await historyTrigger(page, "en").click();
+  await expect(historyMenu(page, "en").getByRole("alert")).toContainText("Cannot open missing.md:");
+  await expect(historyMenu(page, "en").getByRole("alert")).not.toContainText("无法打开");
+  await expect(openEntry(page, "missing.md", missingPath, "en")).toBeVisible();
+  await expect.poll(async () => (await storedHistory(page))[0]?.path).toBe(missingPath);
   bridge.setFile(missingPath, "# Recovered file\n\nNow accessible.\n");
-  await openEntry(page, "missing.md", missingPath).click();
+  await openEntry(page, "missing.md", missingPath, "en").click();
   await expect(immersiveEditor(page).getByRole("heading", { name: "Recovered file", exact: true })).toBeVisible();
-  await expect(historyMenu(page)).toBeHidden();
+  await expect(historyMenu(page, "en")).toBeHidden();
   expect(bridge.reads).toEqual([missingPath, missingPath]);
+  await expect(page.locator(".statusBar")).toContainText("Saved");
+});
+
+test("reopening the original path after Save As cannot replace the renamed dirty tab or its undo history", async ({ page }) => {
+  const bridge = await mockDesktopFiles(page, {
+    files: { [firstPath]: firstSource },
+    startupFiles: [{ path: firstPath, name: "first.md", content: firstSource }], savePaths: [secondPath]
+  });
+  await page.goto("/");
+  await expect(immersiveEditor(page).getByRole("heading", { name: "First file", exact: true })).toBeVisible();
+  await page.locator(".toolbar").getByRole("button", { name: "另存为", exact: true }).click();
+  await expect(page.locator(".tabs .tab.active .tabName")).toHaveText("second.md");
+  await expect.poll(() => bridge.writes).toEqual([{ path: secondPath, content: firstSource }]);
+  await expect.poll(async () => (await storedHistory(page)).map((entry) => entry.path)).toEqual([secondPath, firstPath]);
+  const paragraph = immersiveEditor(page).locator("p").filter({ hasText: "Original first paragraph." });
+  await paragraph.click();
+  await page.keyboard.press("End");
+  await page.keyboard.insertText(" Keep the renamed file's unsaved edit.");
+  await expect(page.locator(".tabs .tab.active .tabName")).toHaveText("second.md*");
+  await historyTrigger(page).click();
+  await openEntry(page, "first.md", firstPath).click();
+  await expect(page.locator(".tabs .tab")).toHaveCount(2);
+  await expect(page.locator(".tabs .tab.active .tabName")).toHaveText("first.md");
+  await expect(paragraph).toHaveText("Original first paragraph.");
+  await expect(page.locator(".statusBar")).toContainText("已保存");
+  expect(bridge.reads).toEqual([firstPath]);
+  await page.locator(".tabs .tab").filter({ has: page.locator(".tabName", { hasText: "second.md*" }) }).click();
+  await expect(paragraph).toHaveText("Original first paragraph. Keep the renamed file's unsaved edit.");
+  await expect(page.locator(".statusBar")).toContainText("已修改");
+  const undo = page.locator(".formatNavLine").getByRole("button", { name: "撤销", exact: true });
+  await expect(undo).toBeEnabled();
+  await undo.click();
+  await expect(paragraph).toHaveText("Original first paragraph.");
+  await expect(page.locator(".tabs .tab.active .tabName")).toHaveText("second.md");
   await expect(page.locator(".statusBar")).toContainText("已保存");
 });
 
