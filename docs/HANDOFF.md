@@ -15,15 +15,19 @@
 ## 当前交接：2026-11-26 模式切换保留光标位置
 
 - 用户反馈：源码中已编辑到 300 多行，切回沉浸模式却回到文章开头。要求切换后停留在源码光标对应内容，便于继续编辑。
-- 基准 `49bc774c56da2b995ffaf23005a3b94c6be75d6c`，集成分支 `agent/mode-position-20261126`，目标 0.3.4。实现与浏览器回归分别使用独立工作树；主 agent 负责整合、验证、文档与发布。
+- 基准 `49bc774c56da2b995ffaf23005a3b94c6be75d6c`，集成分支 `agent/mode-position-20261126` 已合入并推送 `main`，版本 0.3.4。实现与浏览器回归分别使用独立工作树；主 agent 负责整合、验证、文档与发布。
 - 已实现：模式按钮点击时经 imperative ref 读取当前编辑器位置，不在每次光标移动时触发 React 更新。Monaco 只返回活动文件、当前模型且非 Diff 的光标；沉浸模式用当前源文临时解析行映射，再把节点路径转回现有模型，保留源文、dirty 和撤销历史。
 - 模块：`src/App.tsx` 交换位置命令；`EditorPane.tsx` 读取光标并复用 goTo；`ImmersiveEditor.tsx` 捕获选区、应用定位、可取消的滚动；`immersiveMarkdown.ts` 保存嵌套源码行信息并提供双向映射；共享位置类型在 `src/types.ts`。长列表定位到具体项，代码定位到内容行，表格定位到行；复杂行内语法的列可能近似，公式/图表/原始节点就近定位，不承诺源码符号与可视字符逐一对应。
 - 富节点异步渲染完成时可在 10 秒窗口内重新居中；指针/键盘/滚轮/触摸、选区/文档变化、换文件或隐藏会取消旧定位，避免迟到渲染打断用户。未加入持续 RAF 轮询、视图重建或源文格式化。
 - 验收：长文档 300 行以后切回沉浸时目标实际进入视口；普通块、列表/代码等位置可继续编辑；仅切换的保存字节和 dirty 保持，源码修改后映射有效，多文件来回切换不串位置。
 - 本轮 Windows x64、Node 22.14.0/npm 10.9.2、Rust 1.99.1：重新 `npm ci`、类型检查、构建、101 项前端测试、版本 0.3.4 校验、Rust check/test（`--manifest-path src-tauri/Cargo.toml --locked -j 1`，9 项）通过。保留既有大 chunk 提示；依赖清单未新增包。
-- 首次 Edge 完整回归中 21 项既有用例通过，新增长文档脚本点击整个 `.view-lines` 时，Playwright 自动滚动使点击点移出可见区域，两组用例超时；追踪日志明确为点击重试，第三组前停止了该运行。改为聚焦真实编辑输入区后，3 项专项全部通过（12.8 秒），未改变产品逻辑、超时或断言。随后完整 26 组全部通过（58.1 秒），包含实际下载 HTML 的离线公式/图表/字体/图片、净化与快速标签切换。
+- 首次 Edge 完整回归中 21 项既有用例通过，新增长文档脚本点击整个 `.view-lines` 时，Playwright 自动滚动使点击点移出可见区域，两组用例超时；追踪日志明确为点击重试，随后停止该运行，未把其余用例记为通过。改为聚焦真实编辑输入区后，3 项专项全部通过（12.8 秒），未改变产品逻辑、超时或断言。随后完整 26 组全部通过（58.1 秒），包含实际下载 HTML 的离线公式/图表/字体/图片、净化与快速标签切换。
 - 已核对本轮截图：[源码第 345 行对应段落](assets/muleditor-0.3.4-position-paragraph.png)、[连续列表第 325 项](assets/muleditor-0.3.4-position-list.png)。源码修改后定位与继续输入、仅切换字节保真、dirty 与撤销保留、多文件隔离均由真实交互验证。
-- 当前阶段：实现和本地前端/后端验证完成，待本轮原生构建、云端 CI 和 Release；稳定下载仍为 v0.3.3。下一步从包含本交接的干净提交执行标准原生构建/打包，推送 main 与新标签 v0.3.4，核验实际附件后回填证据。
+- 本轮从干净发行源执行 `npm.cmd run tauri:build -- --no-sign` 和 `scripts/package-release.ps1 -ExpectedVersion 0.3.4 -SourceCommit <发行源 SHA>` 通过；本机使用可选 Cargo target 缓存，生成 EXE/NSIS/便携 ZIP。新 EXE 传入公开渲染夹具后启动检查通过（版本 0.3.4、窗口“哞-编辑器”、Responding=True），只关闭本次测试进程。未逐项重做原生 UI 或运行安装器安装，交互验收依据为本轮真实浏览器回归。
+- 发行源 `d6a15f3a71afb680a4654f5ae1fb34087f322cf9` 已合入并推送 `main`，标签 `v0.3.4` 指向该提交。[云端 CI](https://github.com/walcracia/muleditor/actions/runs/45793339170) 成功：重新锁定安装、版本/类型/构建检查、101 前端测试、26 Chromium 回归（38.3 秒）、9 Rust 测试全部通过。前端 artifact `muleditor-web-d6a15f3a71afb680a4654f5ae1fb34087f322cf9` 已实际下载，含 index.html 和 123 个 assets，保留至 2026-12-26 17:38 Asia/Shanghai。
+- [Windows Release](https://github.com/walcracia/muleditor/actions/runs/45793343372) 成功，[v0.3.4](https://github.com/walcracia/muleditor/releases/tag/v0.3.4) 已公开发布。正式三个附件均已实际下载，便携包内仅 README.txt 与哞-编辑器.exe，README 的完整源提交匹配。EXE 的 FileVersion/ProductVersion 为 `0.3.4`，EXE/安装器均 `NotSigned`；EXE SHA-256 `66b806a653b12c4d0f30e8a3b1977379492b3cb71192abe7d2ae66e6fab442bb`。下载版本仅核对元数据和内容，未启动 EXE 或安装器；本机同源构建启动证据见上文。
+- 下载：[便携 ZIP](https://github.com/walcracia/muleditor/releases/download/v0.3.4/MulEditor-0.3.4-windows-x64-portable.zip) SHA-256 `ad5a6367bccf078fc1527a9294346b8b3eb05ab00ebc4ac555bf708750784ce4`；[安装包](https://github.com/walcracia/muleditor/releases/download/v0.3.4/MulEditor-0.3.4-windows-x64-setup.exe) SHA-256 `85bddcde062c72f1aa098327489ee852b1c8927494a88856270440fb8b893889`，均与[校验清单](https://github.com/walcracia/muleditor/releases/download/v0.3.4/SHA256SUMS.txt)匹配。标签对象和 peeled 源提交已通过服务端 API 核对一致。
+- 下一步：本轮需求、验证及发布全部完成，无阻塞。包含本交接的后续提交只确认文档，运行 `git log -1` 查询；不移动已发布标签或替换资产。新电脑先检查 `git status --short --branch` 和 fetch，干净工作区 `git pull --ff-only`，首次 `npm ci`，按用户后续需求继续。原有 Monaco CDN、未签名、会话不持久化等边界保留。
 
 ## 已完成交接：2026-11-25 格式指示去重与强化高亮
 

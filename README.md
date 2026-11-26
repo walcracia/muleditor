@@ -24,7 +24,7 @@ Markdown 两种模式切换时会定位到当前光标对应的内容，长列�
 
 前往 [GitHub Releases](https://github.com/walcracia/muleditor/releases) 下载已发布版本，在对应版本的 Assets 中选择：
 
-当前已验证版本：[v0.3.3](https://github.com/walcracia/muleditor/releases/tag/v0.3.3)（[便携 ZIP](https://github.com/walcracia/muleditor/releases/download/v0.3.3/MulEditor-0.3.3-windows-x64-portable.zip) · [安装包](https://github.com/walcracia/muleditor/releases/download/v0.3.3/MulEditor-0.3.3-windows-x64-setup.exe) · [校验清单](https://github.com/walcracia/muleditor/releases/download/v0.3.3/SHA256SUMS.txt)）。
+当前已验证版本：[v0.3.4](https://github.com/walcracia/muleditor/releases/tag/v0.3.4)（[便携 ZIP](https://github.com/walcracia/muleditor/releases/download/v0.3.4/MulEditor-0.3.4-windows-x64-portable.zip) · [安装包](https://github.com/walcracia/muleditor/releases/download/v0.3.4/MulEditor-0.3.4-windows-x64-setup.exe) · [校验清单](https://github.com/walcracia/muleditor/releases/download/v0.3.4/SHA256SUMS.txt)）。
 
 - `MulEditor-{version}-windows-x64-setup.exe`：Windows x64 安装包。
 - `MulEditor-{version}-windows-x64-portable.zip`：解压后运行的便携包。
